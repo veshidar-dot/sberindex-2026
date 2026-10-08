@@ -6,7 +6,7 @@ data:
   connection: connection.parquet
   market_access: market_access.parquet
   mo_names: ref/mo_names.csv          # справочник territory_id -> название (СберИндекс, CC BY-SA 4.0)
-  events: ref/events.csv              # каталог событий (новости), см. docs
+  events: ref/events_merged.csv       # каталог событий: ref/events.csv (наш) + реестр maloyan с привязкой к МО (python -m sbi.news)
   national: ref/consumer_spending_national.csv  # СберИндекс «Потребительские расходы», РФ, млрд руб./мес.
 
 output_dir: out                       # прогнозы, метрики, рисунки (не в git)
@@ -42,6 +42,21 @@ models:
     national_rule: combo
     rho: 0.6                          # затухание текущего отклонения МО к прошлогоднему того же месяца
   lgbm:
+    national_rule: combo
+    neighbors: 10                     # соседей по автодорогам (connection.parquet)
+    n_estimators: 400
+    learning_rate: 0.03
+    num_leaves: 31
+    min_child_samples: 100
+    subsample: 0.8
+    subsample_freq: 1
+    colsample_bytree: 0.8
+    objective: l1                     # MAE в логах -> медиана
+    random_state: 42
+    n_jobs: 4
+    verbose: -1
+  lgbm_news:                          # то же + неожиданность новостей GDELT в месяцы o и o-1
+    news: [hazard, docs, neg_docs]
     national_rule: combo
     neighbors: 10                     # соседей по автодорогам (connection.parquet)
     n_estimators: 400
@@ -102,3 +117,12 @@ detection:
     sample: 1500                      # случайные полные ряды для калибровки порогов
     alpha: 0.05
     top: 40
+
+gdelt:                                # поток новостей GDELT по МО (ref/news, MIT, см. SOURCES.md)
+  ref_months: 6                       # опорный период для шума ряда (как в детекции на реальных данных)
+  vars: [hazard, neg_docs, docs]      # бедствия (катастрофы+паводки+пожары), негативные, все сообщения
+  shift_threshold: 4.0                # подтверждённый сдвиг: |среднее 3 мес. после - 3 мес. до| в единицах шума
+  news_threshold: 1.0                 # всплеск: log(1+x) выше среднего за 6 прошлых месяцев на 1 (в ~2.7 раза)
+  boot: 300                           # бутстреп по МО для доверительных интервалов
+  detector_shift_threshold: 6.0       # метка сдвига для проверки детектора на реальных данных
+  alarm_rates: [0.01, 0.02, 0.05]     # доля месяцев с тревогой (одинаковая для сравниваемых детекторов)

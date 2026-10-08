@@ -150,7 +150,7 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
 
   <section id="models">
     <span class="eyebrow">Сравнение моделей</span>
-    <h2>Четыре горизонта, пятнадцать моделей</h2>
+    <h2>Четыре горизонта, шестнадцать моделей</h2>
     <div class="controls">
       <label class="ctl" for="m-cat">Категория<select id="m-cat"></select></label>
       <label class="ctl" for="m-metric">Метрика<select id="m-metric"><option value="MAE">MAE, ₽</option><option value="R2">R²</option><option value="WAPE">WAPE</option></select></label>
@@ -195,8 +195,8 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     <h2>Новость повышает вероятность сдвига, но не заменяет данные</h2>
     <div class="two">
       <div>
-        <p class="prose">Каталог событий привязан к МО и месяцу по тем же ключам, что панель СберИндекса. У каждого события есть дата, когда о нём стало известно: модель видит его только с этой даты. Новость не объявляет сдвиг, она повышает его априорную вероятность. Если данные сдвига не показывают, тревоги нет.</p>
-        <p class="prose">Итог: в детекции новости заметно помогают, в прогнозе почти ничего не меняют. Большинство ЧС 2023-2024 гг. не сдвинуло месячные расходы на жителя надолго.</p>
+        <p class="prose">Два источника. Каталог из 37 проверенных событий по 51 МО: паводки 2024 года, наводнение в Приморье, пожары. И поток новостей GDELT по 811 МО: сколько сообщений о МО вышло за месяц, в том числе о бедствиях. Оба привязаны к МО и месяцу по тем же ключам, что панель СберИндекса, и модель видит только то, что было известно на момент прогноза.</p>
+        <p class="prose">Новость не объявляет сдвиг, она повышает его априорную вероятность. Проверенные события почти вдвое повышают полноту детекции на реальных сдвигах. Сырой поток новостей о сдвигах заранее не предупреждает: после поправки на календарь всплеск новостей не делает сдвиг заметно вероятнее, а в прогнозе снижает ошибку меньше чем на 1 %.</p>
       </div>
       <div class="scroll"><table id="news-table"></table></div>
     </div>
@@ -223,12 +223,12 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
 (function () {
   const LABEL = {
     ensemble: "Ансамбль (наша)", panel_ssm: "Панельная модель (наша)", panel_ssm_news: "Панельная + новости",
-    lgbm: "LightGBM на панели", prophet: "Prophet (базовая)", chronos2: "Chronos-2", chronos2_cross: "Chronos-2, cross-learning",
+    lgbm: "LightGBM на панели", lgbm_news: "LightGBM + новости GDELT", prophet: "Prophet (базовая)", chronos2: "Chronos-2", chronos2_cross: "Chronos-2, cross-learning",
     panel_ssm_chronos: "Панельная, нац. ряд - Chronos-2", panel_ssm_automap: "Панельная, нац. ряд по данным",
     naive: "Наивная", seasonal_naive: "Сезонная наивная", panel_seasonal: "Разложение + сезонность МО",
     timesfm_local: "TimesFM 2.5 на локальной части", chronos2_local: "Chronos-2 на локальной части", timesfm: "TimesFM 2.5"
   };
-  const ORDER = ["ensemble", "timesfm_local", "chronos2_local", "panel_ssm", "panel_ssm_news", "lgbm", "panel_seasonal", "panel_ssm_automap", "prophet", "panel_ssm_chronos", "naive", "seasonal_naive", "timesfm", "chronos2_cross", "chronos2"];
+  const ORDER = ["ensemble", "timesfm_local", "chronos2_local", "panel_ssm", "panel_ssm_news", "lgbm", "lgbm_news", "panel_seasonal", "panel_ssm_automap", "prophet", "panel_ssm_chronos", "naive", "seasonal_naive", "timesfm", "chronos2_cross", "chronos2"];
   const OURS = new Set(["ensemble", "panel_ssm"]);
   const DET = { ssm_lr_news: "LR-тест + новости", ssm_lr: "LR-тест в модели", bocpd_news: "BOCPD + новости", bocpd: "BOCPD", pelt: "PELT", cusum: "CUSUM" };
   const H = [1, 3, 6, 12];
@@ -365,7 +365,8 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     document.getElementById("news-table").innerHTML = `<thead><tr><th>Где</th><th>Без новостей</th><th>С новостями</th></tr></thead><tbody>
       <tr><td>Синтетика: полнота LR-теста при 5 % ложных тревог</td><td>${(ds.find(r => r.detector === "ssm_lr" && r.group === "все" && r.alpha === 0.05) || {}).recall?.toFixed(2) ?? "-"}</td><td>${(ds.find(r => r.detector === "ssm_lr_news" && r.group === "все" && r.alpha === 0.05) || {}).recall?.toFixed(2) ?? "-"}</td></tr>
       <tr><td>Реальные события: ряды с тревогой за 3 мес.</td><td>${share("ssm_lr")}</td><td>${share("ssm_lr_news")}</td></tr>
-      <tr><td>Прогноз на рядах событий, MAE h = 1</td><td>${D.news_effect ? Math.round(D.news_effect.panel_ssm) + " ₽" : "-"}</td><td>${D.news_effect ? Math.round(D.news_effect.panel_ssm_news) + " ₽" : "-"}</td></tr></tbody>`;
+      <tr><td>Прогноз на рядах событий (каталог), MAE h = 1</td><td>${D.news_effect ? Math.round(D.news_effect.panel_ssm) + " ₽" : "-"}</td><td>${D.news_effect ? Math.round(D.news_effect.panel_ssm_news) + " ₽" : "-"}</td></tr>
+      <tr><td>Поток GDELT в LightGBM, MAE h = 3, все ряды</td><td>${fmt(get("lgbm", 3, "Итого", "MAE"), "MAE")} ₽</td><td>${fmt(get("lgbm_news", 3, "Итого", "MAE"), "MAE")} ₽</td></tr></tbody>`;
     function share(k) { const r = D.detection_real_events || []; return r.length ? (r.filter(x => x[k] >= 0).length / r.length * 100).toFixed(1).replace(".", ",") + " %" : "-"; }
   }
 

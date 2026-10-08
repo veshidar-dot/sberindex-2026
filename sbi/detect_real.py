@@ -65,6 +65,8 @@ def main():
     out = []
     for _, ev in events.iterrows():
         t0 = panel.month_index(ev.event_month)
+        if t0 < start:          # событие в опорном периоде: детектор ещё не работает
+            continue
         for j in np.where(np.isin(tid[rows], ev.ids))[0]:
             r = {"event": ev.event_id, "territory_id": tid[rows[j]], "МО": names[tid[rows[j]]],
                  "category": CATEGORIES[cat[j]], "month": ev.event_month,
