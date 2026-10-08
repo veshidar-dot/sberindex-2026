@@ -25,6 +25,7 @@ STEPS = [
     ["sbi.detect_real"],
     ["sbi.gdelt"],
     ["sbi.news_eval"],
+    ["sbi.studies"],
     ["sbi.export_landing"],
 ]
 

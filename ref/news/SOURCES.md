@@ -11,6 +11,7 @@
 | `gdelt_monthly_region.parquet` | `data/external/news_monthly_region.parquet` | maloyan/sberindex-2026-forecasting, `beebf5b365` |
 | `gdelt_location_match.csv` | `data/external/news_location_match.csv` | maloyan/sberindex-2026-forecasting, `beebf5b365` |
 | `event_registry_maloyan.csv` | `data/external/event_registry.csv` | maloyan/sberindex-2026-forecasting, `beebf5b365` |
+| `rosstat_retail_monthly.csv` | `data/external/rosstat_monthly.csv` | maloyan/sberindex-2026-forecasting, `beebf5b365` |
 | `event_registry_rav11l.csv` | `data/events/registry.csv` | rav11l/sberindex-shocks, `956bbf10a6` |
 
 Что внутри:
@@ -19,6 +20,9 @@
   документов, тематические счётчики (катастрофы, паводки, пожары, экономика, цены, инфраструктура, безопасность).
   Покрытие - 811 МО, 2022-12 ... 2024-12.
 - `gdelt_location_match.csv` - сопоставление мест из GDELT (название, координаты) с `territory_id` и кодом региона.
+- `rosstat_retail_monthly.csv` - месячный оборот розничной торговли (всего, продовольственные, непродовольственные)
+  и общественного питания, 2000-2025. По описанию в исходном репозитории это данные Росстата; мы проверили шов: с 2018-12 значения совпадают
+  с национальным рядом СберИндекса «Потребительские расходы» (`ref/consumer_spending_national.csv`) до тысячных.
 - `event_registry_*` - реестры событий со ссылками на первоисточники (решения Банка России по ключевой ставке,
   региональные события), датой объявления и ожидаемым знаком эффекта.
 
