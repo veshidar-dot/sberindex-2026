@@ -15,6 +15,7 @@ REGISTRY = {
     "naive": "sbi.models.baselines:naive",
     "seasonal_naive": "sbi.models.baselines:seasonal_naive",
     "prophet": "sbi.models.baselines:prophet",
+    "prophet_seasonal": "sbi.models.baselines:prophet",
     "panel_ssm": "sbi.models.panel_ssm:panel_ssm",
     "panel_ssm_chronos": "sbi.models.panel_ssm:panel_ssm",
     "panel_ssm_news": "sbi.models.panel_ssm:panel_ssm",
@@ -26,6 +27,8 @@ REGISTRY = {
     "chronos2": "sbi.models.chronos_fm:chronos2",
     "chronos2_cross": "sbi.models.chronos_fm:chronos2_cross",
     "chronos2_local": "sbi.models.fm_local:chronos2_local",
+    "chronos2_ft_local": "sbi.models.fm_local:chronos2_ft_local",
+    "tirex_local": "sbi.models.fm_local:tirex_local",
     "timesfm": "sbi.models.fm_local:timesfm",
     "timesfm_local": "sbi.models.fm_local:timesfm_local",
 }

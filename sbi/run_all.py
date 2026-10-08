@@ -1,6 +1,6 @@
 """Полный прогон проекта одной командой.
 
-    python -m sbi.run_all                  # всё с нуля (CPU 16 ядер: около 6 ч, из них Prophet ~3.5 ч)
+    python -m sbi.run_all                  # всё с нуля (CPU 16 ядер: около 12 ч, из них два Prophet ~7 ч)
     python -m sbi.run_all --skip-existing  # не пересчитывать прогнозы, которые уже лежат в out/forecasts
 
 Порядок: каталог событий -> прогнозы всех моделей (ансамбль после своих членов) -> метрики и тесты DM ->
@@ -15,7 +15,8 @@ from .config import load_config, out_path
 
 MODELS = ["naive", "seasonal_naive", "panel_ssm", "panel_ssm_news", "panel_ssm_automap", "panel_seasonal",
           "lgbm", "lgbm_news", "timesfm_local", "chronos2_local", "ensemble",
-          "chronos2", "chronos2_cross", "timesfm", "panel_ssm_chronos", "prophet"]
+          "chronos2", "chronos2_cross", "timesfm", "panel_ssm_chronos", "chronos2_ft_local", "tirex_local",
+          "prophet", "prophet_seasonal"]
 
 STEPS = [
     ["sbi.report"],
@@ -26,6 +27,7 @@ STEPS = [
     ["sbi.gdelt"],
     ["sbi.news_eval"],
     ["sbi.studies"],
+    ["sbi.fm_compare"],
     ["sbi.export_landing"],
 ]
 

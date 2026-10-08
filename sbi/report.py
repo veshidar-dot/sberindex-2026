@@ -41,17 +41,20 @@ def main():
     print(tot.round(3).to_string())
 
     base = cfg["validation"]["baseline"]
-    if base in fc:
+    extra = cfg["validation"].get("extra_baselines", [])
+    for b in [base] + extra:
+        if b not in fc:
+            continue
         rows = []
         for name, (F, _) in fc.items():
-            if name == base:
+            if name == b or np.isnan(F).all(axis=(0, 2)).mean() > 0.5:   # модели на подвыборке - в sbi.fm_compare
                 continue
             for h in hs:
-                rows.append({"model": name, "h": h, **diebold_mariano(panel, F, fc[base][0], origins, h)})
+                rows.append({"model": name, "h": h, **diebold_mariano(panel, F, fc[b][0], origins, h)})
         dm = pd.DataFrame(rows)
-        dm.to_csv(out_path(cfg, "dm_vs_baseline.csv"), index=False, encoding="utf-8")
-        print(f"\nDM против {base} (mean_diff < 0 - модель точнее):")
-        print(dm.round(4).to_string(index=False))
+        dm.to_csv(out_path(cfg, "dm_vs_baseline.csv" if b == base else f"dm_vs_{b}.csv"), index=False, encoding="utf-8")
+        print(f"\nDM против {b} (mean_diff < 0 - модель точнее):")
+        print(dm[dm.model.isin(["ensemble", "panel_ssm", "timesfm_local", "prophet", "prophet_seasonal", "naive"])].round(4).to_string(index=False))
     write_markdown(cfg, tab, out_path(cfg, "dm_vs_baseline.csv") if base in fc else None, hs)
 
 

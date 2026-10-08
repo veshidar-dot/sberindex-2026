@@ -18,6 +18,7 @@ validation:
   horizons: [1, 3, 6, 12]
   max_h: 12
   baseline: prophet                   # с чем сравниваем в тесте Диболда-Мариано
+  extra_baselines: [prophet_seasonal] # вторая, более сильная база: Prophet с сезонностью национального ряда
 
 models:
   naive: {}
@@ -25,6 +26,13 @@ models:
   prophet:
     n_jobs: 12
     yearly_seasonality: auto          # по умолчанию: годовая сезонность выключается при < 2 лет данных
+    weekly_seasonality: false
+    daily_seasonality: false
+  prophet_seasonal:                   # сильная база: Prophet на ряде, очищенном от сезонности национального ряда
+    n_jobs: 10
+    seasonal_profile: true
+    cache_name: prophet_seasonal
+    yearly_seasonality: auto
     weekly_seasonality: false
     daily_seasonality: false
   panel_ssm:
@@ -86,6 +94,23 @@ models:
     national_rule: combo
     batch_size: 256
     threads: 6
+  chronos2_ft_local:                  # Chronos-2, дообученный (LoRA) на локальных компонентах панели; своя копия на каждую точку начала
+    model: amazon/chronos-2
+    national_rule: combo
+    ft_mode: lora
+    ft_lr: 1.0e-5
+    ft_steps: 200
+    ft_batch: 128
+    ft_horizon: 6                     # длина цели в окнах дообучения (история 12-23 мес.)
+    ft_min_past: 4
+    ft_min_len: 10
+    batch_size: 256
+    threads: 6
+  tirex_local:                        # TiRex (NX-AI, xLSTM) на локальной компоненте; на CPU медленный - подвыборка
+    model: NX-AI/TiRex
+    national_rule: combo
+    sample_per_category: 500          # 3000 рядов; сравнение с другими моделями - на тех же рядах (sbi.fm_compare)
+    batch_size: 512
   timesfm:
     model: google/timesfm-2.5-200m-pytorch
     batch_size: 256
