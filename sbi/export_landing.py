@@ -36,11 +36,16 @@ def main():
     dm = out_path(cfg, "dm_vs_baseline.csv")
     if dm.exists():
         out["dm"] = pd.read_csv(dm).to_dict("records")
-    for k in ("ablation_national_fixed", "ablation_national_auto", "detection_synthetic",
-              "detection_real_events", "detection_real_top"):
+    for k in ("ablation_national_fixed", "ablation_national_auto", "detection_real_events",
+              "detection_real_top", "detection_real_labeled", "detection_summary"):
         f = out_path(cfg, f"{k}.csv")
         if f.exists():
             out[k] = pd.read_csv(f).to_dict("records")
+    f = out_path(cfg, "detection_synthetic.csv")
+    if f.exists():   # среднее по повторам синтетики
+        d = pd.read_csv(f)
+        keys = ["detector", "group", "alpha"]
+        out["detection_synthetic"] = d.groupby(keys)[["recall", "precision", "delay"]].mean().reset_index().to_dict("records")
 
     ne = out_path(cfg, "news_effect.csv")
     if ne.exists():

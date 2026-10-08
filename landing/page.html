@@ -164,9 +164,10 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     <h2>Какой детектор находит сдвиг быстрее</h2>
     <div class="two">
       <div>
-        <p class="prose">В 1800 настоящих рядов вставили ступеньки на 10, 20 и 30 % в случайный месяц. Каждый детектор видит данные только до текущего месяца. Порог подобран так, чтобы у всех была одинаковая доля ложных тревог на рядах без вставки, и только потом сравнивается полнота.</p>
+        <p class="prose">В 1800 настоящих рядов вставили ступеньки на 10, 20 и 30 % в случайный месяц, пять раз с разными вставками. Каждый детектор видит данные только до текущего месяца. Порог подобран так, чтобы у всех была одинаковая доля ложных тревог на рядах без вставки, и только потом сравнивается полнота.</p>
+        <p class="prose">Лучший вариант смотрит на МО в двух каналах: сам ряд и ряд за вычетом 10 ближайших соседей по дорогам. Соседи убирают общий для местности шум, и сдвиг МО виден лучше. На реальных данных каналы различают шок местности (паводок по всему бассейну) и шок самого МО, каждый с точностью 84-85 % при 1 % месяцев с тревогой.</p>
         <div class="scroll"><table id="det-table"></table></div>
-        <p class="note">Полнота и задержка при 5 % ложных тревог. Новость в синтетике есть у половины настоящих сдвигов и у 2 % рядов без них.</p>
+        <p class="note">Полнота, точность и задержка при 5 % ложных тревог, среднее по 5 повторам. Новость в синтетике есть у половины настоящих сдвигов и у 2 % рядов без них.</p>
       </div>
       <div>
         <div class="controls"><label class="ctl" for="d-group">Сдвиги<select id="d-group"></select></label></div>
@@ -230,7 +231,7 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
   };
   const ORDER = ["ensemble", "timesfm_local", "chronos2_local", "panel_ssm", "panel_ssm_news", "lgbm", "lgbm_news", "panel_seasonal", "panel_ssm_automap", "prophet", "panel_ssm_chronos", "naive", "seasonal_naive", "timesfm", "chronos2_cross", "chronos2"];
   const OURS = new Set(["ensemble", "panel_ssm"]);
-  const DET = { ssm_lr_news: "LR-тест + новости", ssm_lr: "LR-тест в модели", bocpd_news: "BOCPD + новости", bocpd: "BOCPD", pelt: "PELT", cusum: "CUSUM" };
+  const DET = { ssm_lr_spatial_news: "LR-тест относительно соседей + новости", ssm_lr_news: "LR-тест + новости", ssm_lr_spatial: "LR-тест относительно соседей", ssm_lr: "LR-тест в модели", bocpd_news: "BOCPD + новости", bocpd: "BOCPD", pelt: "PELT", cusum: "CUSUM" };
   const H = [1, 3, 6, 12];
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const fmt = (v, m) => v == null ? "-" : m === "MAE" ? Math.round(v).toLocaleString("ru-RU") : m === "R2" ? v.toFixed(3) : (v * 100).toFixed(1) + " %";
@@ -313,10 +314,10 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     // детекция
     const ds = D.detection_synthetic || [];
     const dets = Object.keys(DET).filter(d => ds.some(r => r.detector === d));
-    const dcol = { ssm_lr_news: css("--model"), ssm_lr: css("--model"), bocpd_news: css("--good"), bocpd: css("--good"), pelt: css("--base"), cusum: css("--muted") };
-    const ddash = { ssm_lr: "6 4", bocpd: "6 4" };
+    const dcol = { ssm_lr_spatial_news: css("--alert"), ssm_lr_spatial: css("--alert"), ssm_lr_news: css("--model"), ssm_lr: css("--model"), bocpd_news: css("--good"), bocpd: css("--good"), pelt: css("--base"), cusum: css("--muted") };
+    const ddash = { ssm_lr: "6 4", bocpd: "6 4", ssm_lr_spatial: "6 4" };
     document.getElementById("det-table").innerHTML = `<thead><tr><th>Детектор</th><th>Полнота</th><th>Точность</th><th>Задержка, мес.</th></tr></thead><tbody>` +
-      dets.map(d => { const r = ds.find(r => r.detector === d && r.group === "все" && r.alpha === 0.05); return `<tr class="${d === "ssm_lr_news" ? "ours" : ""}"><td>${DET[d]}</td><td>${r.recall.toFixed(2)}</td><td>${r.precision.toFixed(2)}</td><td>${r.delay.toFixed(2)}</td></tr>`; }).join("") + "</tbody>";
+      dets.map(d => { const r = ds.find(r => r.detector === d && r.group === "все" && r.alpha === 0.05); return `<tr class="${d === "ssm_lr_spatial_news" ? "ours" : ""}"><td>${DET[d]}</td><td>${r.recall.toFixed(2)}</td><td>${r.precision.toFixed(2)}</td><td>${r.delay.toFixed(2)}</td></tr>`; }).join("") + "</tbody>";
     const gSel = document.getElementById("d-group");
     const groups = [...new Set(ds.map(r => r.group))];
     gSel.innerHTML = groups.map(g => `<option value="${g}">${g === "все" ? "Все сдвиги" : g.startsWith("|delta|") ? "Сдвиг " + Math.round(parseFloat(g.split("=")[1]) * 100) + " %" : g}</option>`).join("");

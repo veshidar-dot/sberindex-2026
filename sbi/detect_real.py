@@ -15,9 +15,56 @@ import pandas as pd
 from .config import data_path, load_config, out_path
 from .data import CATEGORIES, load_panel
 from .detect import DETECTORS
-from .detect_eval import prepare
+from .detect_eval import prepare, prepare_relative
 from .models.panel_ssm import fit
 from .news import boost_matrix, load_events
+
+
+def labeled_eval(S, big, start, rates, window=3):
+    """Точность и полнота онлайн-детектора по сдвигам, подтверждённым задним числом.
+    Пороги - по доле месяцев с тревогой (rates). Тревога в t верна, если сдвиг начался в t-window+1..t;
+    сдвиг пойман, если тревога пришла в t..t+window-1."""
+    T = S.shape[1]
+    cols = np.arange(start, T - 2)
+    out = []
+    for r in rates:
+        thr = np.quantile(S[:, cols], 1 - r)
+        alarm = np.zeros_like(S, bool)
+        alarm[:, cols] = S[:, cols] > thr
+        ok_alarm = np.zeros_like(alarm)
+        caught = np.zeros_like(big)
+        for t in cols:
+            ok_alarm[:, t] = alarm[:, t] & big[:, max(0, t - window + 1):t + 1].any(1)
+            caught[:, t] = big[:, t] & alarm[:, t:t + window].any(1)
+        out.append({"alarm_rate": r, "precision": ok_alarm.sum() / max(alarm.sum(), 1),
+                    "recall": caught[:, cols].sum() / max(big[:, cols].sum(), 1)})
+    return out
+
+
+def labeled_study(cfg, panel, start):
+    """ssm_lr, ssm_lr_spatial и их комбинация на всех полных рядах; метки - подтверждённые сдвиги самого
+    ряда и сдвиги относительно соседей (|среднее 3 мес. после - 3 мес. до| >= порога в единицах шума)."""
+    from .gdelt import confirmed_shifts
+    p = cfg["detection"]
+    Z, _, full = prepare(panel, start)
+    Zr, _, nbcnt = prepare_relative(panel, cfg, start, p.get("neighbors", 10))
+    idx = np.where(full & (nbcnt > 0))[0]
+    S, Sr = np.zeros((len(idx), panel.T)), np.zeros((len(idx), panel.T))
+    for c in range(6):
+        m = panel.cat[idx] == c
+        lam, phi = fit(Z[idx[m]])[:2]
+        S[m] = DETECTORS["ssm_lr"](Z[idx[m]], lam, phi, w=p["window"], warm=start)
+        lam, phi = fit(Zr[idx[m]])[:2]
+        Sr[m] = DETECTORS["ssm_lr"](Zr[idx[m]], lam, phi, w=p["window"], warm=start)
+    thr = cfg["gdelt"]["detector_shift_threshold"]
+    labels = {"сдвиг ряда": np.abs(np.nan_to_num(confirmed_shifts(Z[idx]))) >= thr,
+              "сдвиг относительно соседей": np.abs(np.nan_to_num(confirmed_shifts(Zr[idx]))) >= thr}
+    rows = []
+    for lname, big in labels.items():
+        for dname, sc in (("ssm_lr", S), ("ssm_lr_spatial", Sr), ("ssm_lr_combo", np.maximum(S, Sr))):
+            for r in labeled_eval(sc, big, start, cfg["gdelt"]["alarm_rates"], p["window"]):
+                rows.append({"labels": lname, "detector": dname, **r})
+    return pd.DataFrame(rows)
 
 
 def main():
@@ -57,6 +104,17 @@ def main():
     for t in range(Z.shape[1]):
         prior[:, t] = 2 * np.log(news[:, max(0, t - p["window"] + 1):t + 1].max(1))
     scores["ssm_lr_news"] = S + prior
+    # пространственные варианты: ряд «МО минус соседи по дорогам»
+    Zr0, _, nbcnt = prepare_relative(panel, cfg, pr["ref_months"], p.get("neighbors", 10))
+    Zr = np.where(nbcnt[rows, None] > 0, Zr0[rows], Z)      # без соседей - обычный ряд
+    Sr = np.zeros_like(Z)
+    for c in range(6):
+        m = cat == c
+        lam, phi = fit(Zr0[full & (panel.cat == c) & (nbcnt > 0)])[:2]
+        Sr[m] = DETECTORS["ssm_lr"](Zr[m], lam, phi, w=p["window"], warm=start)
+    scores["ssm_lr_spatial"] = Sr
+    scores["ssm_lr_combo"] = np.maximum(S, Sr)
+    scores["ssm_lr_combo_news"] = scores["ssm_lr_combo"] + prior
 
     in_sample = np.isin(rows, sample)
     thr = {n: np.quantile(s[in_sample, start:].max(1), 1 - pr["alpha"]) for n, s in scores.items()}
@@ -94,6 +152,11 @@ def main():
                     "jump_log": panel.Y[rows[j], t] - np.nanmean(panel.Y[rows[j], max(0, t - 3):t])})
     pd.DataFrame(top).to_csv(out_path(cfg, "detection_real_top.csv"), index=False, encoding="utf-8")
     pd.Series(thr).to_csv(out_path(cfg, "detection_real_thresholds.csv"), encoding="utf-8")
+
+    lab = labeled_study(cfg, panel, start)
+    lab.to_csv(out_path(cfg, "detection_real_labeled.csv"), index=False, encoding="utf-8")
+    print("\nВсе полные ряды, метки задним числом:")
+    print(lab.round(3).to_string(index=False))
 
 
 if __name__ == "__main__":
