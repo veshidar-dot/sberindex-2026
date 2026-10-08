@@ -42,6 +42,11 @@ def main():
         if f.exists():
             out[k] = pd.read_csv(f).to_dict("records")
 
+    ne = out_path(cfg, "news_effect.csv")
+    if ne.exists():
+        n1 = pd.read_csv(ne).query("h == 1")
+        out["news_effect"] = dict(zip(n1.model, n1["mean"]))
+
     # общая компонента по категориям и национальный ряд
     ext = load_external(cfg)
     out["national_panel"] = {CATEGORIES[c]: two_way(P.Y[P.cat == c])[1].tolist() for c in range(6)}
@@ -49,7 +54,7 @@ def main():
 
     # примеры рядов: факт и прогнозы из точки 2023-12 (h=1..12) и 2024-03 (для событий весны 2024)
     fc = load_forecasts(cfg)
-    show = [m for m in ("prophet", "panel_ssm", "panel_ssm_news", "lgbm", "chronos2", "naive") if m in fc]
+    show = [m for m in ("ensemble", "prophet", "panel_ssm", "lgbm", "chronos2", "naive") if m in fc]
     tid = P.keys["territory_id"].to_numpy()
     ex_ids = [1673, 1672, 1333, 2192, 785, 1459, 1665]
     examples = []
@@ -71,6 +76,11 @@ def main():
     f.parent.mkdir(exist_ok=True)
     f.write_text(json.dumps(_clean(out), ensure_ascii=False), encoding="utf-8")
     print(f, f.stat().st_size // 1024, "КБ")
+    # полная страница для GitHub Pages: HTML-каркас вокруг фрагмента landing/page.html
+    head = ('<!doctype html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n'
+            '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n')
+    page = resolve("landing/page.html").read_text(encoding="utf-8")
+    resolve("landing/index.html").write_text(head + page + "\n</html>\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

@@ -52,6 +52,34 @@ def main():
         dm.to_csv(out_path(cfg, "dm_vs_baseline.csv"), index=False, encoding="utf-8")
         print(f"\nDM против {base} (mean_diff < 0 - модель точнее):")
         print(dm.round(4).to_string(index=False))
+    write_markdown(cfg, tab, out_path(cfg, "dm_vs_baseline.csv") if base in fc else None, hs)
+
+
+def write_markdown(cfg, tab, dm_path, hs):
+    """Таблицы для отчёта (out/tables.md): итоговые метрики и MAE по категориям."""
+    def md(df):
+        cols = list(df.columns)
+        lines = ["| " + " | ".join(map(str, cols)) + " |", "|" + "---|" * len(cols)]
+        lines += ["| " + " | ".join(map(str, r)) + " |" for r in df.itertuples(index=False)]
+        return "\n".join(lines)
+    tot = tab[tab.category == "Итого"]
+    out = []
+    for metric, f in (("MAE", lambda v: f"{v:,.0f}".replace(",", " ")), ("R2", lambda v: f"{v:.3f}"),
+                      ("WAPE", lambda v: f"{v:.1%}")):
+        # лучшие сверху: по MAE и WAPE - по возрастанию, по R2 - по убыванию
+        p = tot.pivot(index="model", columns="h", values=metric).sort_values(hs[-1], ascending=metric != "R2")
+        p = p.map(f).reset_index().rename(columns={h: f"h = {h}" for h in hs})
+        out += [f"### {metric}", "", md(p), ""]
+    for h in hs:
+        p = tab[tab.h == h].pivot(index="model", columns="category", values="MAE").round(0).astype("Int64").reset_index()
+        out += [f"### MAE по категориям, h = {h}", "", md(p), ""]
+    if dm_path is not None:
+        dm = pd.read_csv(dm_path)
+        dm["p"] = dm.p.map(lambda v: "< 0.001" if v < 0.001 else f"{v:.3f}")
+        dm["mean_diff"] = dm.mean_diff.round(1)
+        dm["DM"] = dm.DM.round(2)
+        out += ["### Диболд-Мариано против базовой модели", "", md(dm[["model", "h", "mean_diff", "DM", "p", "units", "by"]]), ""]
+    out_path(cfg, "tables.md").write_text("\n".join(out), encoding="utf-8")
 
 
 if __name__ == "__main__":

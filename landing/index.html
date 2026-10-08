@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Расходы МО: прогноз и сдвиги</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Макет: одна колонка «бюллетеня» шириной ~70 знаков, графики и таблицы шире текста; цифры моноширинные, как в чеке. */
+:root {
+  --paper: #f3f5f4;
+  --sheet: #ffffff;
+  --ink: #16201d;
+  --muted: #5d6a66;
+  --rule: #d5dcd9;
+  --model: #2f45c8;      /* наша модель */
+  --base: #9a8a76;       /* Prophet и прочие базовые */
+  --alert: #d9531e;      /* сдвиги и тревоги */
+  --good: #2e7d4f;
+  --font-display: "Unbounded", "Golos Text", system-ui, sans-serif;
+  --font-body: "Golos Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #111614; --sheet: #18201d; --ink: #e6ece9; --muted: #98a6a1; --rule: #2c3733;
+    --model: #8597ff; --base: #b8a68d; --alert: #ff7a45; --good: #5fbf86; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #111614; --sheet: #18201d; --ink: #e6ece9; --muted: #98a6a1; --rule: #2c3733;
+  --model: #8597ff; --base: #b8a68d; --alert: #ff7a45; --good: #5fbf86; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 400 16px/1.6 var(--font-body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 80px; display: grid; gap: 64px; }
+.prose { max-width: 68ch; }
+h1, h2 { font-family: var(--font-display); font-weight: 700; text-wrap: balance; letter-spacing: -0.01em; margin: 0; }
+h1 { font-size: clamp(30px, 5.2vw, 52px); line-height: 1.08; }
+h2 { font-size: clamp(21px, 3vw, 28px); line-height: 1.2; }
+h3 { font: 600 17px/1.3 var(--font-body); margin: 0; }
+p { margin: 0; }
+section { display: grid; gap: 20px; }
+.eyebrow { font: 600 12px/1 var(--font-data); text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+.lede { font-size: 19px; line-height: 1.55; max-width: 60ch; }
+.num, table, .mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+a { color: var(--model); }
+a:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--model); outline-offset: 2px; }
+
+/* итоговая строка «чека» */
+.receipt { background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; padding: 20px 22px; display: grid; gap: 14px; }
+.receipt-row { display: grid; grid-template-columns: minmax(150px, 1.4fr) repeat(4, minmax(64px, 1fr)); gap: 8px; align-items: baseline; }
+.receipt-row > span:first-child { font-family: var(--font-body); }
+.receipt-row.head { font: 600 12px/1 var(--font-data); color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.receipt-row .v { text-align: right; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.receipt-row.ours .v { color: var(--model); font-weight: 600; font-size: 18px; }
+.receipt-row.total { border-top: 1px dashed var(--rule); padding-top: 12px; }
+.receipt-row.total .v { color: var(--good); font-weight: 600; }
+.scroll { overflow-x: auto; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+.seg button { font: 500 14px/1 var(--font-body); padding: 9px 12px; border: 0; background: var(--sheet); color: var(--ink); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+select { font: 500 14px/1.2 var(--font-body); padding: 8px 10px; border: 1px solid var(--rule); border-radius: 4px; background: var(--sheet); color: var(--ink); max-width: 100%; }
+label.ctl { display: grid; gap: 4px; font: 600 11px/1 var(--font-data); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); min-width: 0; }
+
+.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font: 12px var(--font-data); }
+.chart .grid { stroke: var(--rule); stroke-width: 1; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; }
+.legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; font-family: var(--font-body); white-space: normal; }
+thead th { font: 600 11px/1.2 var(--font-data); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+tr.ours td { color: var(--model); font-weight: 600; }
+tr.base td { color: var(--base); }
+td.best { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px; }
+.two > * { min-width: 0; display: grid; gap: 12px; align-content: start; }
+.formula { font: 15px/1.7 var(--font-data); background: var(--sheet); border-left: 3px solid var(--model); padding: 14px 18px; overflow-x: auto; white-space: pre; }
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.step { border: 1px solid var(--rule); background: var(--sheet); border-radius: 4px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.step .tag { font: 600 11px/1 var(--font-data); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.step.key { border-color: var(--model); }
+.step.alert { border-color: var(--alert); }
+.note { font-size: 14px; color: var(--muted); max-width: 72ch; }
+.pill { display: inline-block; font: 600 11px/1 var(--font-data); padding: 4px 7px; border-radius: 3px; border: 1px solid currentColor; }
+.pill.hit { color: var(--alert); }
+.pill.miss { color: var(--muted); }
+footer { border-top: 1px solid var(--rule); padding-top: 20px; font-size: 14px; color: var(--muted); display: grid; gap: 6px; }
+#load-error { color: var(--alert); }
+header > * { min-width: 0; }
+@media (max-width: 560px) {
+  .receipt { padding: 14px 12px; }
+  .receipt-row { grid-template-columns: minmax(0, 1.3fr) repeat(4, minmax(0, 1fr)); gap: 6px; font-size: 12px; }
+  .receipt-row.head { font-size: 10px; letter-spacing: 0.04em; }
+  .receipt-row.ours .v { font-size: 14px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .chart path.series { transition: d 0.3s ease; }
+}
+</style>
+
+<div class="wrap">
+  <header style="display:grid; gap:18px">
+    <span class="eyebrow">Конкурс СберИндекса 2026 · номинация «Прогнозирование»</span>
+    <h1>Расходы МО: прогноз и сдвиги</h1>
+    <p class="lede">Безналичные расходы жителей 2190 муниципалитетов в рублях на человека. Прогноз на 1, 3, 6 и 12 месяцев и раннее обнаружение структурных сдвигов. Главная мысль: муниципалитет движется вместе со страной, поэтому общую траекторию берём из длинного национального ряда СберИндекса, а локальную часть оцениваем фильтром Калмана по всей панели.</p>
+    <div class="receipt" aria-label="Средняя абсолютная ошибка, рублей на жителя">
+      <div class="receipt-row head"><span>MAE, ₽ на жителя</span><span class="v">h = 1</span><span class="v">h = 3</span><span class="v">h = 6</span><span class="v">h = 12</span></div>
+      <div id="receipt-body"></div>
+    </div>
+    <p class="note">Ошибка по всем МО, категориям и точкам начала прогноза с 2023-12 по 2024-11. Лучшая модель - ансамбль панельной модели и LightGBM.</p>
+    <p id="load-error" hidden></p>
+  </header>
+
+  <section id="architecture">
+    <span class="eyebrow">Как устроено</span>
+    <h2>Страна + муниципалитет + сдвиг</h2>
+    <div class="formula">log y(i,t) = n(c,t) + μ(i,t) + r(i,t)
+μ(i,t) = μ(i,t−1) + η(i,t)       уровень МО, сдвиги
+r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</div>
+    <div class="flow">
+      <div class="step"><span class="tag">Данные</span><h3>Панель 2190 МО × 6 категорий</h3><p class="note">24 месяца, 2023-01 … 2024-12, рубли на жителя.</p></div>
+      <div class="step key"><span class="tag">Общая траектория n</span><h3>Национальный ряд СберИндекса</h3><p class="note">«Потребительские расходы» с 2018 г.: сезонность и рост, которых нет в одном году панели. Среднее четырёх простых правил.</p></div>
+      <div class="step key"><span class="tag">Локальная часть μ + r</span><h3>Фильтр Калмана по панели</h3><p class="note">Параметры одни на категорию, оценка ММП по всем МО сразу.</p></div>
+      <div class="step"><span class="tag">Второе мнение</span><h3>LightGBM на панели</h3><p class="note">Лаги, уровень МО, доступность рынков, соседи по дорогам.</p></div>
+      <div class="step key"><span class="tag">Прогноз</span><h3>Ансамбль</h3><p class="note">Среднее в логах, равные веса, заданы заранее.</p></div>
+      <div class="step alert"><span class="tag">Сдвиги</span><h3>LR-тест ступеньки в μ + новости</h3><p class="note">Событие в МО повышает априорную вероятность сдвига.</p></div>
+    </div>
+  </section>
+
+  <section id="why">
+    <span class="eyebrow">Почему так</span>
+    <h2>Ошибку делает общая траектория, а не муниципалитет</h2>
+    <div class="two">
+      <div>
+        <p class="prose">Возьмём одну и ту же простую локальную часть и будем менять только прогноз общей траектории категории. Если подставить её фактическое будущее («оракул»), ошибка падает вдвое. Значит, вкладываться надо в прогноз общей траектории: её сезонность и рост видны только на длинном ряду.</p>
+        <p class="note">Случайное блуждание - общая траектория замирает на последнем месяце. Правила - сезонная наивная с ростом, гибрид, SARIMA по национальному ряду, уровень без сезонности; «среднее» - их комбинация, она и стоит в модели.</p>
+      </div>
+      <div>
+        <svg id="ablation" class="chart" viewBox="0 0 480 300" role="img" aria-label="MAE при разных прогнозах общей траектории"></svg>
+        <div class="legend" id="ablation-legend"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="models">
+    <span class="eyebrow">Сравнение моделей</span>
+    <h2>Четыре горизонта, девять моделей</h2>
+    <div class="controls">
+      <label class="ctl" for="m-cat">Категория<select id="m-cat"></select></label>
+      <label class="ctl" for="m-metric">Метрика<select id="m-metric"><option value="MAE">MAE, ₽</option><option value="R2">R²</option><option value="WAPE">WAPE</option></select></label>
+    </div>
+    <div class="scroll"><table id="models-table"></table></div>
+    <p class="note" id="dm-note"></p>
+  </section>
+
+  <section id="detection">
+    <span class="eyebrow">Структурные сдвиги</span>
+    <h2>Какой детектор находит сдвиг быстрее</h2>
+    <div class="two">
+      <div>
+        <p class="prose">В 1800 настоящих рядов вставили ступеньки на 10, 20 и 30 % в случайный месяц. Каждый детектор видит данные только до текущего месяца. Порог подобран так, чтобы у всех была одинаковая доля ложных тревог на рядах без вставки, и только потом сравнивается полнота.</p>
+        <div class="scroll"><table id="det-table"></table></div>
+        <p class="note">Полнота и задержка при 5 % ложных тревог. Новость в синтетике есть у половины настоящих сдвигов и у 2 % рядов без них.</p>
+      </div>
+      <div>
+        <div class="controls"><label class="ctl" for="d-group">Сдвиги<select id="d-group"></select></label></div>
+        <svg id="det-chart" class="chart" viewBox="0 0 480 320" role="img" aria-label="Полнота в зависимости от доли ложных тревог"></svg>
+        <div class="legend" id="det-legend"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cases">
+    <span class="eyebrow">Реальные примеры</span>
+    <h2>Паводки 2024 года, тайфун в Приморье и другие события</h2>
+    <p class="prose">Выберите муниципалитет, категорию и месяц, из которого строится прогноз. Чёрная линия - факт, цветные - прогнозы моделей на 12 месяцев вперёд, оранжевая отметка - месяц события из каталога новостей.</p>
+    <div class="controls">
+      <label class="ctl" for="c-mo">Муниципалитет<select id="c-mo"></select></label>
+      <label class="ctl" for="c-cat">Категория<select id="c-cat"></select></label>
+      <span class="ctl">Прогноз из<span class="seg" id="c-origin"></span></span>
+    </div>
+    <svg id="case-chart" class="chart" viewBox="0 0 760 340" role="img" aria-label="Факт и прогнозы для выбранного ряда"></svg>
+    <div class="legend" id="case-legend"></div>
+    <p class="note" id="case-note"></p>
+  </section>
+
+  <section id="news">
+    <span class="eyebrow">Новости</span>
+    <h2>Новость повышает вероятность сдвига, но не заменяет данные</h2>
+    <div class="two">
+      <div>
+        <p class="prose">Каталог событий привязан к МО и месяцу по тем же ключам, что панель СберИндекса. У каждого события есть дата, когда о нём стало известно: модель видит его только с этой даты. Новость не объявляет сдвиг, она повышает его априорную вероятность. Если данные сдвига не показывают, тревоги нет.</p>
+        <p class="prose">Итог: в детекции новости заметно помогают, в прогнозе почти ничего не меняют. Большинство ЧС 2023-2024 гг. не сдвинуло месячные расходы на жителя надолго.</p>
+      </div>
+      <div class="scroll"><table id="news-table"></table></div>
+    </div>
+  </section>
+
+  <section id="limits">
+    <span class="eyebrow">Ограничения</span>
+    <h2>Что эти данные позволяют проверить, а что нет</h2>
+    <ul class="prose" style="margin:0; padding-left:20px; display:grid; gap:8px">
+      <li>24 месяца: горизонт 12 проверяется одной точкой (обучение на 2023, прогноз на 2024), её надёжность ниже коротких горизонтов.</li>
+      <li>Курской и Белгородской областей в данных нет, поэтому события августа 2024 г. проверить нельзя.</li>
+      <li>Национальный ряд взят в редакции октября 2026 г.: возможные пересмотры прошлых значений не учтены.</li>
+      <li>Шумные ряды мелких МО (общепит, до 18 % в месяц) не дают надёжно ловить сдвиги около 10 %.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>Код, конфигурация и методологический отчёт: <a href="https://github.com/uknownlogos-creator/1" target="_blank" rel="noopener">github.com/uknownlogos-creator/1</a></span>
+    <span>Данные: СберИндекс, «Потребительские безналичные расходы на уровне МО», «Потребительские расходы», CC BY-SA 4.0.</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  const LABEL = {
+    ensemble: "Ансамбль (наша)", panel_ssm: "Панельная модель (наша)", panel_ssm_news: "Панельная + новости",
+    lgbm: "LightGBM на панели", prophet: "Prophet (базовая)", chronos2: "Chronos-2", chronos2_cross: "Chronos-2, cross-learning",
+    panel_ssm_chronos: "Панельная, нац. ряд - Chronos-2", panel_ssm_automap: "Панельная, нац. ряд по данным",
+    naive: "Наивная", seasonal_naive: "Сезонная наивная"
+  };
+  const ORDER = ["ensemble", "panel_ssm", "panel_ssm_news", "lgbm", "panel_ssm_automap", "panel_ssm_chronos", "chronos2_cross", "chronos2", "prophet", "seasonal_naive", "naive"];
+  const OURS = new Set(["ensemble", "panel_ssm"]);
+  const DET = { ssm_lr_news: "LR-тест + новости", ssm_lr: "LR-тест в модели", bocpd_news: "BOCPD + новости", bocpd: "BOCPD", pelt: "PELT", cusum: "CUSUM" };
+  const H = [1, 3, 6, 12];
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const fmt = (v, m) => v == null ? "-" : m === "MAE" ? Math.round(v).toLocaleString("ru-RU") : m === "R2" ? v.toFixed(3) : (v * 100).toFixed(1) + " %";
+  const el = (tag, attrs = {}, kids = []) => { const e = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const k in attrs) e.setAttribute(k, attrs[k]); kids.forEach(c => e.appendChild(c)); return e; };
+  const txt = (x, y, s, a = {}) => { const t = el("text", { x, y, ...a }); t.textContent = s; return t; };
+  const ticks = (lo, hi, n = 5) => { const step = Math.pow(10, Math.floor(Math.log10((hi - lo) / n))); const m = [1, 2, 2.5, 5, 10].find(k => (hi - lo) / (step * k) <= n) * step; const out = []; for (let v = Math.ceil(lo / m) * m; v <= hi + 1e-9; v += m) out.push(+v.toFixed(6)); return out; };
+
+  function palette(names) {
+    const fixed = { ensemble: css("--model"), panel_ssm: css("--model"), prophet: css("--base"), actual: css("--ink") };
+    const extra = ["#2a9d8f", "#8e5bd0", "#c08a00", "#6b7f78", "#b4477a"];
+    let k = 0; const out = {};
+    names.forEach(n => out[n] = fixed[n] || extra[k++ % extra.length]);
+    return out;
+  }
+
+  function lineChart(svg, { W, Hh, series, xLabels, yFmt, markX, pad = { l: 64, r: 16, t: 14, b: 34 }, yMin }) {
+    svg.innerHTML = "";
+    const all = series.flatMap(s => s.values.filter(v => v != null));
+    let lo = yMin != null ? yMin : Math.min(...all), hi = Math.max(...all);
+    const span = hi - lo || 1; if (yMin == null) lo -= span * 0.06; hi += span * 0.06;
+    const tk = ticks(lo, hi, 5); lo = Math.min(lo, tk[0]); hi = Math.max(hi, tk[tk.length - 1]);
+    const n = xLabels.length;
+    const x = i => pad.l + (W - pad.l - pad.r) * (n === 1 ? 0.5 : i / (n - 1));
+    const y = v => pad.t + (Hh - pad.t - pad.b) * (1 - (v - lo) / (hi - lo));
+    tk.forEach(v => { svg.appendChild(el("line", { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), class: "grid" })); svg.appendChild(txt(pad.l - 8, y(v) + 4, yFmt(v), { "text-anchor": "end" })); });
+    const every = Math.max(1, Math.ceil(n / 8));
+    xLabels.forEach((s, i) => { if (i % every === 0 || i === n - 1) svg.appendChild(txt(x(i), Hh - 10, s, { "text-anchor": "middle" })); });
+    if (markX != null) { svg.appendChild(el("line", { x1: x(markX), x2: x(markX), y1: pad.t, y2: Hh - pad.b, stroke: css("--alert"), "stroke-width": 2, "stroke-dasharray": "4 4" })); }
+    series.forEach(s => {
+      let d = "", pen = false;
+      s.values.forEach((v, i) => { if (v == null) { pen = false; return; } d += (pen ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); pen = true; });
+      svg.appendChild(el("path", { d, fill: "none", stroke: s.color, "stroke-width": s.width || 2, "stroke-dasharray": s.dash || "", class: "series", "stroke-linejoin": "round" }));
+      s.values.forEach((v, i) => { if (v != null && s.dots) svg.appendChild(el("circle", { cx: x(i), cy: y(v), r: 3, fill: s.color })); });
+    });
+  }
+
+  function legend(node, items) {
+    node.innerHTML = items.map(([name, color, dash]) => `<span><i style="background:${dash ? "transparent" : color};${dash ? `border-top:2px dashed ${color};height:0` : ""}"></i>${name}</span>`).join("");
+  }
+
+  function render(D) {
+    const met = D.metrics;
+    const get = (m, h, cat, key) => { const r = met.find(r => r.model === m && r.h === h && r.category === cat); return r ? r[key] : null; };
+    const models = ORDER.filter(m => met.some(r => r.model === m));
+
+    // итоговый «чек»
+    const rows = [["ensemble", "ours"], ["prophet", ""], ["naive", ""]].filter(([m]) => models.includes(m));
+    let html = rows.map(([m, cls]) => `<div class="receipt-row ${cls}"><span>${LABEL[m]}</span>${H.map(h => `<span class="v">${fmt(get(m, h, "Итого", "MAE"), "MAE")}</span>`).join("")}</div>`).join("");
+    if (models.includes("prophet")) html += `<div class="receipt-row total"><span>Ансамбль точнее Prophet на</span>${H.map(h => { const a = get("ensemble", h, "Итого", "MAE"), b = get("prophet", h, "Итого", "MAE"); return `<span class="v">${a && b ? Math.round((1 - a / b) * 100) + " %" : "-"}</span>`; }).join("")}</div>`;
+    document.getElementById("receipt-body").innerHTML = html;
+    document.getElementById("receipt-body").style.display = "grid";
+    document.getElementById("receipt-body").style.gap = "10px";
+
+    // абляция
+    const ab = D.ablation_national_fixed || [];
+    const abModels = ["random_walk", "snaive", "hybrid", "airline", "extlvl", "combo", "oracle"];
+    const abName = { random_walk: "Случайное блуждание", snaive: "Сезонная наивная + рост", hybrid: "Гибрид", airline: "SARIMA нац. ряда", extlvl: "Уровень без сезонности", combo: "Среднее правил", oracle: "Оракул (факт)" };
+    const abCol = { random_walk: css("--base"), combo: css("--model"), oracle: css("--good") };
+    const absvg = document.getElementById("ablation");
+    const show = ["random_walk", "combo", "oracle"];
+    lineChart(absvg, { W: 480, Hh: 300, xLabels: H.map(h => "h = " + h), yFmt: v => Math.round(v), yMin: 0,
+      series: abModels.filter(m => ab.some(r => r.model === m)).map(m => ({ values: H.map(h => { const r = ab.find(r => r.model === m && r.h === h && r.category === "Итого"); return r ? r.MAE : null; }), color: abCol[m] || css("--rule"), width: show.includes(m) ? 3 : 1.5, dots: show.includes(m) })) });
+    legend(document.getElementById("ablation-legend"), [[abName.random_walk, abCol.random_walk], [abName.combo, abCol.combo], [abName.oracle, abCol.oracle], ["Отдельные правила", css("--rule")]]);
+
+    // таблица моделей
+    const catSel = document.getElementById("m-cat"), metSel = document.getElementById("m-metric");
+    catSel.innerHTML = ["Итого", ...D.categories].map(c => `<option>${c}</option>`).join("");
+    const drawModels = () => {
+      const cat = catSel.value, m = metSel.value;
+      const best = {}; H.forEach(h => { const vals = models.map(x => get(x, h, cat, m)).filter(v => v != null); best[h] = m === "R2" ? Math.max(...vals) : Math.min(...vals); });
+      document.getElementById("models-table").innerHTML = `<thead><tr><th>Модель</th>${H.map(h => `<th>h = ${h}</th>`).join("")}</tr></thead><tbody>` +
+        models.map(x => `<tr class="${OURS.has(x) ? "ours" : x === "prophet" ? "base" : ""}"><td>${LABEL[x] || x}</td>${H.map(h => { const v = get(x, h, cat, m); return `<td class="${v === best[h] ? "best" : ""}">${fmt(v, m)}</td>`; }).join("")}</tr>`).join("") + "</tbody>";
+    };
+    catSel.onchange = metSel.onchange = drawModels; drawModels();
+    if (D.dm) {
+      const e = D.dm.filter(r => r.model === "ensemble");
+      document.getElementById("dm-note").textContent = e.length ? "Тест Диболда-Мариано против Prophet для ансамбля: " + e.map(r => `h = ${r.h}: разность |ошибок| ${Math.round(r.mean_diff)} ₽, p ${r.p < 0.001 ? "< 0,001" : "= " + r.p.toFixed(3).replace(".", ",")}`).join("; ") + ". Подчёркнуто лучшее значение в столбце." : "";
+    }
+
+    // детекция
+    const ds = D.detection_synthetic || [];
+    const dets = Object.keys(DET).filter(d => ds.some(r => r.detector === d));
+    const dcol = { ssm_lr_news: css("--model"), ssm_lr: css("--model"), bocpd_news: css("--good"), bocpd: css("--good"), pelt: css("--base"), cusum: css("--muted") };
+    const ddash = { ssm_lr: "6 4", bocpd: "6 4" };
+    document.getElementById("det-table").innerHTML = `<thead><tr><th>Детектор</th><th>Полнота</th><th>Точность</th><th>Задержка, мес.</th></tr></thead><tbody>` +
+      dets.map(d => { const r = ds.find(r => r.detector === d && r.group === "все" && r.alpha === 0.05); return `<tr class="${d === "ssm_lr_news" ? "ours" : ""}"><td>${DET[d]}</td><td>${r.recall.toFixed(2)}</td><td>${r.precision.toFixed(2)}</td><td>${r.delay.toFixed(2)}</td></tr>`; }).join("") + "</tbody>";
+    const gSel = document.getElementById("d-group");
+    const groups = [...new Set(ds.map(r => r.group))];
+    gSel.innerHTML = groups.map(g => `<option value="${g}">${g === "все" ? "Все сдвиги" : g.startsWith("|delta|") ? "Сдвиг " + Math.round(parseFloat(g.split("=")[1]) * 100) + " %" : g}</option>`).join("");
+    const alphas = [...new Set(ds.map(r => r.alpha))].sort((a, b) => a - b);
+    const drawDet = () => {
+      lineChart(document.getElementById("det-chart"), { W: 480, Hh: 320, xLabels: alphas.map(a => Math.round(a * 100) + " %"), yFmt: v => v.toFixed(1), yMin: 0,
+        series: dets.map(d => ({ values: alphas.map(a => { const r = ds.find(r => r.detector === d && r.group === gSel.value && r.alpha === a); return r ? r.recall : null; }), color: dcol[d], dash: ddash[d], dots: true, width: d === "ssm_lr_news" ? 3 : 2 })) });
+    };
+    gSel.onchange = drawDet; drawDet();
+    legend(document.getElementById("det-legend"), dets.map(d => [DET[d], dcol[d], !!ddash[d]]));
+    const detChart = document.getElementById("det-chart");
+    detChart.appendChild(txt(470, 314, "доля ложных тревог →", { "text-anchor": "end" }));
+
+    // примеры
+    const ex = D.examples || [];
+    const moSel = document.getElementById("c-mo"), cSel = document.getElementById("c-cat"), oSeg = document.getElementById("c-origin");
+    const mos = [...new Map(ex.map(e => [e.territory_id, e.name])).entries()];
+    moSel.innerHTML = mos.map(([id, n]) => `<option value="${id}">${n}</option>`).join("");
+    const evMonth = {}; (D.detection_real_events || []).forEach(r => { evMonth[r.territory_id] = r.month; });
+    const origins = ["2023-12", "2024-03", "2024-06"];
+    let origin = "2024-03";
+    oSeg.innerHTML = origins.map(o => `<button type="button" data-o="${o}" aria-pressed="${o === origin}">${o}</button>`).join("");
+    const fillCats = () => { const id = +moSel.value; cSel.innerHTML = ex.filter(e => e.territory_id === id).map(e => `<option>${e.category}</option>`).join(""); };
+    const drawCase = () => {
+      const e = ex.find(e => e.territory_id === +moSel.value && e.category === cSel.value); if (!e) return;
+      const mList = ["ensemble", "prophet", "chronos2", "naive"].filter(m => e.forecasts[m] && e.forecasts[m][origin]);
+      const col = palette(["actual", ...mList]);
+      const oi = D.months.indexOf(origin);
+      const ser = [{ values: e.actual, color: col.actual, width: 2.5, dots: true }];
+      mList.forEach(m => { const v = Array(D.months.length).fill(null); v[oi] = e.actual[oi]; e.forecasts[m][origin].forEach((f, k) => { if (oi + 1 + k < v.length) v[oi + 1 + k] = f; }); ser.push({ values: v, color: col[m], width: m === "ensemble" ? 3 : 2, dash: m === "ensemble" ? "" : "5 4" }); });
+      const ev = evMonth[e.territory_id];
+      lineChart(document.getElementById("case-chart"), { W: 760, Hh: 340, xLabels: D.months, yFmt: v => Math.round(v).toLocaleString("ru-RU"), series: ser, markX: ev ? D.months.indexOf(ev) : null });
+      legend(document.getElementById("case-legend"), [["Факт", col.actual], ...mList.map(m => [LABEL[m], col[m], m !== "ensemble"])]);
+      const err = m => { let s = 0, n = 0; e.forecasts[m][origin].forEach((f, k) => { const a = e.actual[oi + 1 + k]; if (a != null && f != null) { s += Math.abs(a - f); n++; } }); return n ? Math.round(s / n) : null; };
+      const det = (D.detection_real_events || []).find(r => r.territory_id === e.territory_id && r.category === e.category);
+      const detTxt = det ? (det.ssm_lr_news >= 0 ? ` LR-тест с новостями поднял тревогу через ${det.ssm_lr_news} мес. после события.` : " Детектор с новостями тревоги не поднял: устойчивого сдвига в данных нет.") : "";
+      document.getElementById("case-note").textContent = "Средняя ошибка этого ряда на доступных горизонтах: " + mList.map(m => `${LABEL[m]} ${err(m)?.toLocaleString("ru-RU") ?? "-"} ₽`).join(", ") + "." + (ev ? ` Событие: ${ev}.` : "") + detTxt;
+    };
+    moSel.onchange = () => { fillCats(); drawCase(); };
+    cSel.onchange = drawCase;
+    oSeg.onclick = ev => { const b = ev.target.closest("button"); if (!b) return; origin = b.dataset.o; oSeg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); drawCase(); };
+    fillCats(); cSel.value = "Все категории"; drawCase();
+
+    // новости
+    const ne = D.news_events || [];
+    document.getElementById("news-table").innerHTML = `<thead><tr><th>Где</th><th>Без новостей</th><th>С новостями</th></tr></thead><tbody>
+      <tr><td>Синтетика: полнота LR-теста при 5 % ложных тревог</td><td>${(ds.find(r => r.detector === "ssm_lr" && r.group === "все" && r.alpha === 0.05) || {}).recall?.toFixed(2) ?? "-"}</td><td>${(ds.find(r => r.detector === "ssm_lr_news" && r.group === "все" && r.alpha === 0.05) || {}).recall?.toFixed(2) ?? "-"}</td></tr>
+      <tr><td>Реальные события: ряды с тревогой за 3 мес.</td><td>${share("ssm_lr")}</td><td>${share("ssm_lr_news")}</td></tr>
+      <tr><td>Прогноз на рядах событий, MAE h = 1</td><td>${D.news_effect ? Math.round(D.news_effect.panel_ssm) + " ₽" : "-"}</td><td>${D.news_effect ? Math.round(D.news_effect.panel_ssm_news) + " ₽" : "-"}</td></tr></tbody>`;
+    function share(k) { const r = D.detection_real_events || []; return r.length ? (r.filter(x => x[k] >= 0).length / r.length * 100).toFixed(1).replace(".", ",") + " %" : "-"; }
+  }
+
+  fetch("data.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(render).catch(err => {
+    const p = document.getElementById("load-error"); p.hidden = false; p.textContent = "Не удалось загрузить data.json рядом со страницей (" + err.message + "). Соберите его командой python -m sbi.export_landing.";
+  });
+})();
+</script>
+
+</html>

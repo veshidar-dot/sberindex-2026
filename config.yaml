@@ -23,7 +23,7 @@ models:
   naive: {}
   seasonal_naive: {}
   prophet:
-    n_jobs: 14
+    n_jobs: 12
     yearly_seasonality: auto          # по умолчанию: годовая сезонность выключается при < 2 лет данных
     weekly_seasonality: false
     daily_seasonality: false

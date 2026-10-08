@@ -34,9 +34,9 @@ def main():
                     rows += [{"model": name, "event": e.event_id, "h": h, "abs_err": v}
                              for v in np.abs(y[ok] - f[ok])]
     d = pd.DataFrame(rows)
-    t = d.groupby(["model", "h"]).abs_err.agg(["mean", "count"]).unstack("h")
-    t.to_csv(out_path(cfg, "news_effect.csv"), encoding="utf-8")
-    print(t.round(1).to_string())
+    t = d.groupby(["model", "h"]).abs_err.agg(["mean", "count"])
+    t.reset_index().to_csv(out_path(cfg, "news_effect.csv"), index=False, encoding="utf-8")
+    print(t.unstack("h").round(1).to_string())
     print(d.groupby(["event", "model"]).abs_err.mean().unstack().round(1).to_string())
 
 
