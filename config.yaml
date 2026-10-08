@@ -38,6 +38,9 @@ models:
     news_factor: 25                   # в МО с известным событием дисперсия сдвига уровня x25 (месяц события и следующий)
   panel_ssm_chronos:
     national_rule: chronos            # Chronos-2 прогнозирует национальный ряд СберИндекса
+  panel_seasonal:
+    national_rule: combo
+    rho: 0.6                          # затухание текущего отклонения МО к прошлогоднему того же месяца
   lgbm:
     national_rule: combo
     neighbors: 10                     # соседей по автодорогам (connection.parquet)
@@ -53,7 +56,7 @@ models:
     n_jobs: 4
     verbose: -1
   ensemble:
-    members: [panel_ssm, lgbm]       # среднее в логах, равные веса; строится после членов
+    members: [panel_ssm, panel_seasonal, lgbm, timesfm_local, chronos2_local]   # все модели на разложении; среднее в логах, равные веса
   chronos2:
     model: amazon/chronos-2
     batch_size: 256
@@ -61,6 +64,21 @@ models:
   chronos2_cross:
     model: amazon/chronos-2
     batch_size: 512                   # ряды одной категории в одном батче обмениваются информацией
+    threads: 6
+
+  chronos2_local:                     # Chronos-2 на локальной компоненте (лог минус общая траектория)
+    model: amazon/chronos-2
+    national_rule: combo
+    batch_size: 256
+    threads: 6
+  timesfm:
+    model: google/timesfm-2.5-200m-pytorch
+    batch_size: 256
+    threads: 6
+  timesfm_local:                      # TimesFM 2.5 на локальной компоненте
+    model: google/timesfm-2.5-200m-pytorch
+    national_rule: combo
+    batch_size: 256
     threads: 6
 
 detection:

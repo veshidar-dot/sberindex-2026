@@ -19,10 +19,14 @@ REGISTRY = {
     "panel_ssm_chronos": "sbi.models.panel_ssm:panel_ssm",
     "panel_ssm_news": "sbi.models.panel_ssm:panel_ssm",
     "panel_ssm_automap": "sbi.models.panel_ssm:panel_ssm",
+    "panel_seasonal": "sbi.models.panel_seasonal:panel_seasonal",
     "lgbm": "sbi.models.lgbm:lgbm",
     "ensemble": "sbi.models.ensemble:ensemble",
     "chronos2": "sbi.models.chronos_fm:chronos2",
     "chronos2_cross": "sbi.models.chronos_fm:chronos2_cross",
+    "chronos2_local": "sbi.models.fm_local:chronos2_local",
+    "timesfm": "sbi.models.fm_local:timesfm",
+    "timesfm_local": "sbi.models.fm_local:timesfm_local",
 }
 
 

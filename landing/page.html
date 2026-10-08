@@ -113,7 +113,7 @@ header > * { min-width: 0; }
       <div class="receipt-row head"><span>MAE, ₽ на жителя</span><span class="v">h = 1</span><span class="v">h = 3</span><span class="v">h = 6</span><span class="v">h = 12</span></div>
       <div id="receipt-body"></div>
     </div>
-    <p class="note">Ошибка по всем МО, категориям и точкам начала прогноза с 2023-12 по 2024-11. Лучшая модель - ансамбль панельной модели и LightGBM.</p>
+    <p class="note">Ошибка по всем МО, категориям и точкам начала прогноза с 2023-12 по 2024-11. Лучшая модель - ансамбль пяти моделей на одном разложении, включая TimesFM 2.5 и Chronos-2.</p>
     <p id="load-error" hidden></p>
   </header>
 
@@ -127,8 +127,8 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
       <div class="step"><span class="tag">Данные</span><h3>Панель 2190 МО × 6 категорий</h3><p class="note">24 месяца, 2023-01 … 2024-12, рубли на жителя.</p></div>
       <div class="step key"><span class="tag">Общая траектория n</span><h3>Национальный ряд СберИндекса</h3><p class="note">«Потребительские расходы» с 2018 г.: сезонность и рост, которых нет в одном году панели. Среднее четырёх простых правил.</p></div>
       <div class="step key"><span class="tag">Локальная часть μ + r</span><h3>Фильтр Калмана по панели</h3><p class="note">Параметры одни на категорию, оценка ММП по всем МО сразу.</p></div>
-      <div class="step"><span class="tag">Второе мнение</span><h3>LightGBM на панели</h3><p class="note">Лаги, уровень МО, доступность рынков, соседи по дорогам.</p></div>
-      <div class="step key"><span class="tag">Прогноз</span><h3>Ансамбль</h3><p class="note">Среднее в логах, равные веса, заданы заранее.</p></div>
+      <div class="step"><span class="tag">Другие взгляды на μ + r</span><h3>LightGBM, TimesFM 2.5, Chronos-2, сезонность МО</h3><p class="note">Бустинг с соседями по дорогам и две фундаментальные модели прогнозируют ту же локальную часть.</p></div>
+      <div class="step key"><span class="tag">Прогноз</span><h3>Ансамбль пяти моделей</h3><p class="note">Среднее в логах, равные веса; состав - все модели на разложении.</p></div>
       <div class="step alert"><span class="tag">Сдвиги</span><h3>LR-тест ступеньки в μ + новости</h3><p class="note">Событие в МО повышает априорную вероятность сдвига.</p></div>
     </div>
   </section>
@@ -150,7 +150,7 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
 
   <section id="models">
     <span class="eyebrow">Сравнение моделей</span>
-    <h2>Четыре горизонта, девять моделей</h2>
+    <h2>Четыре горизонта, пятнадцать моделей</h2>
     <div class="controls">
       <label class="ctl" for="m-cat">Категория<select id="m-cat"></select></label>
       <label class="ctl" for="m-metric">Метрика<select id="m-metric"><option value="MAE">MAE, ₽</option><option value="R2">R²</option><option value="WAPE">WAPE</option></select></label>
@@ -225,9 +225,10 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     ensemble: "Ансамбль (наша)", panel_ssm: "Панельная модель (наша)", panel_ssm_news: "Панельная + новости",
     lgbm: "LightGBM на панели", prophet: "Prophet (базовая)", chronos2: "Chronos-2", chronos2_cross: "Chronos-2, cross-learning",
     panel_ssm_chronos: "Панельная, нац. ряд - Chronos-2", panel_ssm_automap: "Панельная, нац. ряд по данным",
-    naive: "Наивная", seasonal_naive: "Сезонная наивная"
+    naive: "Наивная", seasonal_naive: "Сезонная наивная", panel_seasonal: "Разложение + сезонность МО",
+    timesfm_local: "TimesFM 2.5 на локальной части", chronos2_local: "Chronos-2 на локальной части", timesfm: "TimesFM 2.5"
   };
-  const ORDER = ["ensemble", "panel_ssm", "panel_ssm_news", "lgbm", "panel_ssm_automap", "panel_ssm_chronos", "chronos2_cross", "chronos2", "prophet", "seasonal_naive", "naive"];
+  const ORDER = ["ensemble", "timesfm_local", "chronos2_local", "panel_ssm", "panel_ssm_news", "lgbm", "panel_seasonal", "panel_ssm_automap", "prophet", "panel_ssm_chronos", "naive", "seasonal_naive", "timesfm", "chronos2_cross", "chronos2"];
   const OURS = new Set(["ensemble", "panel_ssm"]);
   const DET = { ssm_lr_news: "LR-тест + новости", ssm_lr: "LR-тест в модели", bocpd_news: "BOCPD + новости", bocpd: "BOCPD", pelt: "PELT", cusum: "CUSUM" };
   const H = [1, 3, 6, 12];
@@ -341,7 +342,7 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     const fillCats = () => { const id = +moSel.value; cSel.innerHTML = ex.filter(e => e.territory_id === id).map(e => `<option>${e.category}</option>`).join(""); };
     const drawCase = () => {
       const e = ex.find(e => e.territory_id === +moSel.value && e.category === cSel.value); if (!e) return;
-      const mList = ["ensemble", "prophet", "chronos2", "naive"].filter(m => e.forecasts[m] && e.forecasts[m][origin]);
+      const mList = ["ensemble", "prophet", "timesfm", "naive"].filter(m => e.forecasts[m] && e.forecasts[m][origin]);
       const col = palette(["actual", ...mList]);
       const oi = D.months.indexOf(origin);
       const ser = [{ values: e.actual, color: col.actual, width: 2.5, dots: true }];

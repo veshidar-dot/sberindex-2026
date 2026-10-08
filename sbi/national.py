@@ -89,15 +89,28 @@ def forecast_national(n, months, o, c, ext, H, params=None):
     T = months[o]
     sf = seasonal_factors(xs, T)
     i = len(xs) - 1
-    g_ext = xs.iloc[i - 2:i + 1].mean() - xs.iloc[i - 14:i - 11].mean()
+    # годовой рост нац. ряда: последние 3 мес. к тем же месяцам год назад ("last", по умолчанию),
+    # средний с 2019 г. по 12-месячным суммам ("longrun") или их среднее ("half"). "half" лучше на
+    # истории самого нац. ряда (рост 2022-2023 гг.), но на панели не помог - оставлен как вариант.
+    g_last = xs.iloc[i - 2:i + 1].mean() - xs.iloc[i - 14:i - 11].mean()
+    s12 = np.log(np.exp(xs).rolling(12).sum())
+    base = s12.loc["2019-12"]
+    g_long = (s12.iloc[-1] - base) / ((len(s12.loc["2019-12":]) - 1) / 12)
+    g_ext = {"last": g_last, "longrun": g_long, "half": (g_last + g_long) / 2}[params.get("growth", "last")]
     G = np.mean([g_ext, n[o - 2:o + 1].mean() - n[o - 14:o - 11].mean()]) if o >= 14 else g_ext
 
     out = {}
     hs = np.arange(1, H + 1)
     tgt = [month_after(T, h) for h in hs]
     out["snaive"] = np.array([n[o + h - 12] + G if 0 <= o + h - 12 <= o else n[o] + G * h / 12 for h in hs])
-    ds = np.array([n[o + h - 12] - n[o - 12] if o - 12 >= 0 and o + h - 12 <= o
-                   else sf[m[5:]] - sf[T[5:]] for h, m in zip(hs, tgt)])
+    # сезонная разность T -> T+h: из панели за прошлый год (очищена от прошлогоднего роста
+    # n[o] - n[o-12], иначе рост учитывался бы дважды) или из сезонных факторов нац. ряда
+    if o - 12 >= 0:
+        g_last = n[o] - n[o - 12]
+        ds = np.array([n[o + h - 12] - n[o - 12] - g_last * h / 12 if o + h - 12 <= o
+                       else sf[m[5:]] - sf[T[5:]] for h, m in zip(hs, tgt)])
+    else:
+        ds = np.array([sf[m[5:]] - sf[T[5:]] for m in tgt])
     out["hybrid"] = n[o] + ds + G * hs / 12
     start = params.get("airline_start", "2021-01")
     xf = _airline(xs.loc[start:].to_numpy(), H)

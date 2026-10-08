@@ -43,7 +43,7 @@ python -m sbi.detect_real
 
 `sbi.forecast` без аргументов строит все модели; одну или несколько - `--models panel_ssm prophet`.
 Время на 16-ядерном CPU: Prophet около 40 мин, Chronos-2 около 15 мин на вариант, остальное - минуты.
-Веса Chronos-2 (`amazon/chronos-2`) скачиваются с Hugging Face при первом запуске.
+Веса Chronos-2 (`amazon/chronos-2`) и TimesFM 2.5 (`google/timesfm-2.5-200m-pytorch`, ~800 МБ) скачиваются с Hugging Face при первом запуске; TimesFM - около 12 мин на вариант.
 
 Результаты складываются в `out/`: прогнозы `forecasts/*.npz`, метрики `metrics.csv`,
 тесты Диболда-Мариано `dm_vs_baseline.csv`, детекция `detection_*.csv`.
@@ -62,7 +62,10 @@ python -m sbi.detect_real
 | `sbi/models/panel_ssm.py` | центральная модель: фильтр Калмана по панели, ММП |
 | `sbi/models/baselines.py` | наивная, сезонная наивная, Prophet (базовая модель конкурса) |
 | `sbi/models/lgbm.py` | LightGBM на панели с признаками соседей по графу дорог |
-| `sbi/models/chronos_fm.py` | Chronos-2 без дообучения |
+| `sbi/models/panel_seasonal.py` | разложение с собственной сезонностью МО |
+| `sbi/models/chronos_fm.py` | Chronos-2 без дообучения по сырым рядам |
+| `sbi/models/fm_local.py` | TimesFM 2.5 и Chronos-2 на локальной компоненте (лог минус общая траектория), TimesFM по сырым рядам |
+| `sbi/models/ensemble.py` | итоговый ансамбль: среднее в логах пяти моделей на разложении |
 | `sbi/news.py` | каталог событий -> множители вероятности сдвига (без заглядывания вперёд) |
 | `sbi/detect.py` | детекторы: CUSUM, PELT, BOCPD, LR-тест в модели пространства состояний |
 | `sbi/detect_eval.py` | сравнение детекторов на вставленных ступеньках |

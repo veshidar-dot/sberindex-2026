@@ -54,7 +54,7 @@ def main():
 
     # примеры рядов: факт и прогнозы из точки 2023-12 (h=1..12) и 2024-03 (для событий весны 2024)
     fc = load_forecasts(cfg)
-    show = [m for m in ("ensemble", "prophet", "panel_ssm", "lgbm", "chronos2", "naive") if m in fc]
+    show = [m for m in ("ensemble", "prophet", "timesfm_local", "timesfm", "naive") if m in fc]
     tid = P.keys["territory_id"].to_numpy()
     ex_ids = [1673, 1672, 1333, 2192, 785, 1459, 1665]
     examples = []
