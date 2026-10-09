@@ -150,7 +150,7 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
 
   <section id="models">
     <span class="eyebrow">Сравнение моделей</span>
-    <h2>Четыре горизонта, шестнадцать моделей</h2>
+    <h2>Четыре горизонта, восемнадцать моделей, две базы</h2>
     <div class="controls">
       <label class="ctl" for="m-cat">Категория<select id="m-cat"></select></label>
       <label class="ctl" for="m-metric">Метрика<select id="m-metric"><option value="MAE">MAE, ₽</option><option value="R2">R²</option><option value="WAPE">WAPE</option></select></label>
@@ -227,9 +227,9 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     lgbm: "LightGBM на панели", lgbm_news: "LightGBM + новости GDELT", prophet: "Prophet (базовая)", chronos2: "Chronos-2", chronos2_cross: "Chronos-2, cross-learning",
     panel_ssm_chronos: "Панельная, нац. ряд - Chronos-2", panel_ssm_automap: "Панельная, нац. ряд по данным",
     naive: "Наивная", seasonal_naive: "Сезонная наивная", panel_seasonal: "Разложение + сезонность МО",
-    timesfm_local: "TimesFM 2.5 на локальной части", chronos2_local: "Chronos-2 на локальной части", timesfm: "TimesFM 2.5"
+    timesfm_local: "TimesFM 2.5 на локальной части", chronos2_local: "Chronos-2 на локальной части", timesfm: "TimesFM 2.5", prophet_seasonal: "Prophet + сезонный профиль", chronos2_ft_local: "Chronos-2 дообученный, локальная часть", tirex_local: "TiRex, локальная часть (подвыборка)", lgbm_news: "LightGBM + новости GDELT"
   };
-  const ORDER = ["ensemble", "timesfm_local", "chronos2_local", "panel_ssm", "panel_ssm_news", "lgbm", "lgbm_news", "panel_seasonal", "panel_ssm_automap", "prophet", "panel_ssm_chronos", "naive", "seasonal_naive", "timesfm", "chronos2_cross", "chronos2"];
+  const ORDER = ["ensemble", "timesfm_local", "chronos2_local", "panel_ssm", "panel_ssm_news", "lgbm", "lgbm_news", "panel_seasonal", "panel_ssm_automap", "chronos2_ft_local", "prophet_seasonal", "prophet", "panel_ssm_chronos", "naive", "seasonal_naive", "timesfm", "chronos2_cross", "chronos2"];
   const OURS = new Set(["ensemble", "panel_ssm"]);
   const DET = { ssm_lr_spatial_news: "LR-тест относительно соседей + новости", ssm_lr_news: "LR-тест + новости", ssm_lr_spatial: "LR-тест относительно соседей", ssm_lr: "LR-тест в модели", bocpd_news: "BOCPD + новости", bocpd: "BOCPD", pelt: "PELT", cusum: "CUSUM" };
   const H = [1, 3, 6, 12];
