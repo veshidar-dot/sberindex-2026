@@ -48,6 +48,12 @@ def main():
     f = out_path(cfg, "national_oos_summary.csv")
     if f.exists():
         out["national_oos"] = pd.read_csv(f).to_dict("records")
+    f = out_path(cfg, "intervals.csv")
+    if f.exists():   # покрытие интервалов (sbi.intervals), итог по всем категориям
+        out["intervals"] = pd.read_csv(f).query("category == 'Итого'").to_dict("records")
+    f = out_path(cfg, "cases.json")
+    if f.exists():   # галерея реальных случаев (sbi.cases)
+        out["cases"] = json.loads(f.read_text(encoding="utf-8"))
     f = out_path(cfg, "forward", "manifest.json")
     if f.exists():
         out["forward"] = {k: v for k, v in json.loads(f.read_text(encoding="utf-8")).items() if k != "months"}

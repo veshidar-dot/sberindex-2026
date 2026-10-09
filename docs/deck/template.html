@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Расходы МО: прогноз и сдвиги</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+@page { size: 1280px 720px; margin: 0; }
+:root {
+  --bg: #fbfaf7; --ink: #15191a; --muted: #5d6764; --rule: #d9ddd8; --panel: #f0efe9;
+  --model: #3b4fd6; --base: #b26b1f; --alert: #d0452b; --good: #1f8a5b; --soft: #8a94a0;
+  --font-display: "Unbounded", system-ui, sans-serif; --font-body: "Golos Text", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 400 17px/1.45 var(--font-body);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.slide { width: 1280px; height: 720px; padding: 52px 64px 44px; position: relative; overflow: hidden;
+  page-break-after: always; break-after: page; display: flex; flex-direction: column; gap: 18px; background: var(--bg); }
+.slide:last-child { page-break-after: auto; }
+.eyebrow { font: 600 12px/1 var(--font-data); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 46px/1.1 var(--font-display); margin: 0; letter-spacing: -0.01em; }
+h2 { font: 700 30px/1.15 var(--font-display); margin: 0; letter-spacing: -0.01em; max-width: 1100px; }
+h3 { font: 600 19px/1.25 var(--font-body); margin: 0; }
+p { margin: 0; }
+.lede { font-size: 20px; color: var(--muted); max-width: 1000px; }
+.note { font-size: 13px; color: var(--muted); }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; flex: 1; min-height: 0; }
+.cols.w { grid-template-columns: 1.25fr 1fr; }
+.stack { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.kpi { background: var(--panel); border-radius: 10px; padding: 18px 20px; display: grid; gap: 6px; }
+.kpi b { font: 600 25px/1.15 var(--font-data); color: var(--model); }
+.kpi span { font-size: 14px; color: var(--muted); }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; font-family: var(--font-data); }
+th:first-child, td:first-child { text-align: left; font-family: var(--font-body); white-space: normal; }
+thead th { font: 600 11px/1.2 var(--font-data); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+tr.ours td { color: var(--model); font-weight: 600; }
+tr.base td { color: var(--base); }
+.tag { display: inline-block; font: 600 12px/1 var(--font-data); letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--alert); border: 1px solid var(--alert); border-radius: 999px; padding: 5px 10px; }
+.flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.box { border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; background: #fff; display: grid; gap: 6px; }
+.box.key { border-color: var(--model); }
+.box.alert { border-color: var(--alert); }
+.box .t { font: 600 11px/1 var(--font-data); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.formula { font: 400 15px/1.5 var(--font-data); background: var(--panel); border-radius: 10px; padding: 12px 16px; white-space: pre; }
+svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+svg.chart text { font: 12px var(--font-data); fill: var(--muted); }
+svg.chart line.grid { stroke: var(--rule); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 3px; margin-right: 6px; vertical-align: middle; }
+.foot { position: absolute; left: 64px; right: 64px; bottom: 18px; display: flex; justify-content: space-between;
+  font: 11px var(--font-data); color: var(--soft); }
+.case { display: grid; grid-template-columns: 1fr; gap: 6px; align-content: start; }
+.case p { font-size: 13.5px; line-height: 1.38; }
+.case .tag { justify-self: start; }
+.case ul { align-content: start; }
+.case .facts { font: 12px var(--font-data); color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="deck"></div>
+<script>
+const D = /*DATA*/null;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const H = [1, 3, 6, 12];
+const ru = (v, d = 0) => v == null || !isFinite(v) ? "-" : Number(v).toLocaleString("ru-RU", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pv = p => p < 0.001 ? "< 0,001" : ru(p, 3);
+const mae = (m, h) => (D.metrics.find(r => r.model === m && r.h === h) || {}).MAE;
+const LABEL = { ensemble: "Ансамбль (5 моделей на разложении)", timesfm_local: "TimesFM 2.5 на локальной части", chronos2_ft_local: "Chronos-2 дообученный, локальная часть",
+  chronos2_local: "Chronos-2 на локальной части", panel_ssm: "Модель пространства состояний", panel_ssm_news: "Она же + новости", panel_seasonal: "Разложение + сезонность МО",
+  lgbm: "LightGBM на панели", prophet: "Prophet (базовая)", prophet_seasonal: "Prophet + сезонный профиль", naive: "Наивная", timesfm: "TimesFM 2.5 на сыром ряде",
+  chronos2: "Chronos-2 на сыром ряде", panel_ssm_automap: "Пространство состояний, нац. ряд по данным", tirex_local: "TiRex на локальной части" };
+const DET = { ssm_lr_spatial_news: "LR-тест относительно соседей + новости", ssm_lr_combo_news: "LR-тест, два канала + новости", bocpd_spatial: "BOCPD относительно соседей",
+  ssm_lr_news: "LR-тест + новости", ssm_lr_spatial: "LR-тест относительно соседей", bocpd_news: "BOCPD + новости", bocpd: "BOCPD", pelt: "PELT", ssm_lr: "LR-тест в модели", cusum: "CUSUM", ssm_lr_combo: "LR-тест, два канала" };
+
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, a = {}) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); return e; };
+const txt = (x, y, s, a = {}) => { const t = el("text", { x, y, ...a }); t.textContent = s; return t; };
+function ticks(lo, hi, n = 5) { const st = Math.pow(10, Math.floor(Math.log10((hi - lo) / n))); const m = [1, 2, 2.5, 5, 10].find(k => (hi - lo) / (st * k) <= n) * st; const o = []; for (let v = Math.ceil(lo / m) * m; v <= hi + 1e-9; v += m) o.push(+v.toFixed(6)); return o; }
+function lineChart(svg, { W, Hh, series, xLabels, yFmt, markX, yMin, every }) {
+  const pad = { l: 60, r: 12, t: 10, b: 28 };
+  const all = series.flatMap(s => s.values.filter(v => v != null && isFinite(v)));
+  let lo = yMin != null ? yMin : Math.min(...all), hi = Math.max(...all); const sp = hi - lo || 1;
+  if (yMin == null) lo -= sp * 0.06; hi += sp * 0.06;
+  const tk = ticks(lo, hi, 4); lo = Math.min(lo, tk[0]); hi = Math.max(hi, tk[tk.length - 1]);
+  const n = xLabels.length, x = i => pad.l + (W - pad.l - pad.r) * i / Math.max(n - 1, 1), y = v => pad.t + (Hh - pad.t - pad.b) * (1 - (v - lo) / (hi - lo));
+  svg.setAttribute("viewBox", `0 0 ${W} ${Hh}`);
+  tk.forEach(v => { svg.appendChild(el("line", { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), class: "grid" })); svg.appendChild(txt(pad.l - 8, y(v) + 4, yFmt(v), { "text-anchor": "end" })); });
+  const ev = every || Math.max(1, Math.ceil(n / 8));
+  xLabels.forEach((s, i) => { if (i % ev === 0 || i === n - 1) svg.appendChild(txt(x(i), Hh - 8, s, { "text-anchor": "middle" })); });
+  if (markX != null && markX >= 0) svg.appendChild(el("line", { x1: x(markX), x2: x(markX), y1: pad.t, y2: Hh - pad.b, stroke: css("--alert"), "stroke-width": 1.5, "stroke-dasharray": "4 4" }));
+  series.forEach(s => {
+    let d = "", pen = false;
+    s.values.forEach((v, i) => { if (v == null || !isFinite(v)) { pen = false; return; } d += (pen ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); pen = true; });
+    svg.appendChild(el("path", { d, fill: "none", stroke: s.color, "stroke-width": s.width || 2, "stroke-dasharray": s.dash || "", "stroke-linejoin": "round" }));
+    if (s.dots) s.values.forEach((v, i) => { if (v != null && isFinite(v)) svg.appendChild(el("circle", { cx: x(i), cy: y(v), r: 2.6, fill: s.color })); });
+  });
+}
+function barChart(svg, { W, rows, max, fmt, color }) {
+  const rh = 30, lw = 330, Hh = rows.length * rh + 10;
+  svg.setAttribute("viewBox", `0 0 ${W} ${Hh}`);
+  rows.forEach((r, i) => {
+    const y0 = 4 + i * rh, w = (W - lw - 70) * r.v / max;
+    svg.appendChild(txt(lw - 10, y0 + 19, r.label, { "text-anchor": "end", style: "font: 14px var(--font-body); fill: var(--ink)" }));
+    svg.appendChild(el("rect", { x: lw, y: y0 + 5, width: Math.max(w, 1), height: rh - 12, rx: 3, fill: r.color || color }));
+    if (r.ci) { const a = (W - lw - 70) * (r.v - r.ci) / max, b = (W - lw - 70) * (r.v + r.ci) / max; svg.appendChild(el("line", { x1: lw + a, x2: lw + b, y1: y0 + 14, y2: y0 + 14, stroke: css("--ink"), "stroke-width": 1.5 })); }
+    svg.appendChild(txt(lw + w + 8 + (r.ci ? (W - lw - 70) * r.ci / max : 0), y0 + 19, fmt(r.v), { style: "font: 13px var(--font-data); fill: var(--ink)" }));
+  });
+}
+const legend = items => `<div class="legend">${items.map(([n, c, dash]) => `<span><i style="background:${dash ? "transparent" : c};${dash ? `border-top:2px dashed ${c};height:0` : ""}"></i>${n}</span>`).join("")}</div>`;
+
+const slides = [];
+const S = (eyebrow, title, body, after) => slides.push({ eyebrow, title, body, after });
+const red = h => Math.round((1 - mae("ensemble", h) / mae("prophet", h)) * 100);
+
+// 1. титул
+slides.push({ title: null, body: `
+  <span class="eyebrow">Конкурс СберИндекса 2026 · номинация «Прогнозирование»</span>
+  <h1>Расходы муниципалитетов:<br>прогноз и ранние сдвиги</h1>
+  <p class="lede">Безналичные расходы жителей 2 190 МО в 6 категориях. Прогноз на 1, 3, 6 и 12 месяцев и раннее обнаружение структурных сдвигов. Главная мысль: муниципалитет движется вместе со страной, поэтому общую траекторию берём из длинного национального ряда СберИндекса, а у МО оцениваем только своё.</p>
+  <div class="kpis">
+    <div class="kpi"><b>−${Math.min(...H.map(red))}…−${Math.max(...H.map(red))} %</b><span>MAE ансамбля к Prophet: ${H.map(red).map(v => "−" + v).join(" / ")} % на h = 1 / 3 / 6 / 12</span></div>
+    <div class="kpi"><b>${ru(mae("ensemble", 1))} ₽</b><span>MAE на 1 месяц вперёд (Prophet ${ru(mae("prophet", 1))} ₽)</span></div>
+    <div class="kpi"><b>${ru((D.detect.find(r => r.detector === "ssm_lr_spatial_news") || {}).recall, 2)}</b><span>полнота детектора при 5 % ложных тревог (CUSUM ${ru((D.detect.find(r => r.detector === "cusum") || {}).recall, 2)})</span></div>
+    <div class="kpi"><b>18 + 3</b><span>моделей на всей панели и фундаментальных моделей (Chronos-2, TimesFM 2.5, TiRex)</span></div>
+  </div>
+  <p class="note" style="margin-top:auto">Код и отчёт: github.com/veshidar-dot/sberindex-2026 · Лендинг: veshidar-dot.github.io/sberindex-2026</p>` });
+
+// 2. главная мысль
+S("Почему так", "Ошибку делает общая траектория страны, а не муниципалитет", `
+  <div class="cols w">
+    <div class="stack"><svg class="chart" id="c-abl"></svg><div id="l-abl"></div></div>
+    <div class="stack">
+      <p>Одна и та же простая локальная часть МО, меняется только прогноз общей траектории категории.</p>
+      <ul>
+        <li>Если подставить фактическое будущее траектории («оракул»), MAE на h = 1 падает с ${ru(D.ablation.find(r => r.model === "random_walk" && r.h === 1).MAE)} до ${ru(D.ablation.find(r => r.model === "oracle" && r.h === 1).MAE)} ₽.</li>
+        <li>В панели 24 месяца: годовую сезонность и рост из неё не оценить. Их даёт национальный ряд СберИндекса «Потребительские расходы» с 2018 года.</li>
+        <li>Траекторию прогнозируют четыре простых правила по национальному ряду, в модели стоит их среднее: ${ru(D.ablation.find(r => r.model === "combo" && r.h === 1).MAE)} ₽ на h = 1.</li>
+      </ul>
+    </div>
+  </div>`, () => {
+  const ab = D.ablation, show = { random_walk: ["Траектория замирает", css("--base")], combo: ["Среднее правил (в модели)", css("--model")], oracle: ["Оракул: будущее известно", css("--good")] };
+  lineChart(document.getElementById("c-abl"), { W: 620, Hh: 330, xLabels: H.map(h => "h = " + h), yFmt: v => ru(v), yMin: 0,
+    series: Object.keys(show).map(m => ({ values: H.map(h => (ab.find(r => r.model === m && r.h === h) || {}).MAE), color: show[m][1], width: 3, dots: true })) });
+  document.getElementById("l-abl").innerHTML = legend(Object.values(show));
+});
+
+// 3. архитектура
+S("Как устроено", "Одна модель: прогноз, тревога и объяснение", `
+  <div class="formula">log y(i,t) = n(c,t) + μ(i,t) + r(i,t)       общая траектория категории + уровень МО + временное отклонение
+μ(i,t) = μ(i,t−1) + η(i,t)                   уровень МО: случайное блуждание, сдвиги - его ступеньки
+r(i,t) = φ·r(i,t−1) + u(i,t)                  AR(1); параметры общие для категории, ММП фильтром Калмана по всей панели</div>
+  <div class="flow">
+    <div class="box"><span class="t">Данные</span><h3>Панель 2 190 МО × 6 категорий</h3><p class="note">24 месяца, 2023-01 … 2024-12, рубли на жителя.</p></div>
+    <div class="box key"><span class="t">Общая траектория n</span><h3>Национальный ряд СберИндекса</h3><p class="note">Сезонность и рост с 2018 г.; среднее четырёх правил (сезонная наивная, гибрид, SARIMA, уровень без сезонности).</p></div>
+    <div class="box key"><span class="t">Локальная часть μ + r</span><h3>Фильтр Калмана по панели</h3><p class="note">Плюс 4 других взгляда на ту же часть: сезонность МО, LightGBM с соседями по дорогам, TimesFM 2.5, Chronos-2.</p></div>
+    <div class="box key"><span class="t">Прогноз</span><h3>Ансамбль 5 моделей</h3><p class="note">Среднее в логах, равные веса; состав задан правилом «все модели на разложении», а не подобран по тесту.</p></div>
+    <div class="box alert"><span class="t">Тревога</span><h3>LR-тест ступеньки в μ</h3><p class="note">Та же модель, то же правдоподобие; два канала: сам ряд и ряд «МО минус 10 соседей по дорогам».</p></div>
+    <div class="box alert"><span class="t">Объяснение</span><h3>Новость - априорная вероятность</h3><p class="note">Событие из каталога снижает порог для МО на 2-3 месяца; решение остаётся за данными.</p></div>
+  </div>
+  <p class="note">Без заглядывания вперёд: траектория, параметры, новости - только по данным до точки начала; 10 тестов портят будущее и проверяют, что прогноз не меняется.</p>`);
+
+// 4. модели
+S("Сравнение моделей", "Четыре горизонта: ансамбль против Prophet", `
+  <div class="cols w">
+    <div class="stack"><table id="t-mod"></table><p class="note">MAE, руб. на жителя в месяц. Скользящее начало прогноза 2023-12 … 2024-11 (12 точек), все МО и категории, ошибка ровно на шаге h.</p></div>
+    <div class="stack"><table id="t-dm"></table>
+      <ul>
+        <li>Ансамбль точнее Prophet на всех горизонтах и точнее второй, более сильной базы - Prophet с сезонным профилем национального ряда.</li>
+        <li>R² ансамбля ${H.map(h => ru((D.metrics.find(r => r.model === "ensemble" && r.h === h) || {}).R2, 3)).join(" / ")}.</li>
+        <li>Единственное место, где Prophet лучше: «Маркетплейсы» на h = 12 (рост категории +48 % за 2024 г. при национальных рядах +9…17 %).</li>
+      </ul></div>
+  </div>`, () => {
+  const ms = ["ensemble", "timesfm_local", "chronos2_ft_local", "panel_ssm", "panel_seasonal", "lgbm", "prophet_seasonal", "prophet", "naive"];
+  document.getElementById("t-mod").innerHTML = `<thead><tr><th>Модель</th>${H.map(h => `<th>h = ${h}</th>`).join("")}</tr></thead><tbody>` +
+    ms.map(m => `<tr class="${m === "ensemble" ? "ours" : m.startsWith("prophet") ? "base" : ""}"><td>${LABEL[m]}</td>${H.map(h => `<td>${ru(mae(m, h))}</td>`).join("")}</tr>`).join("") + "</tbody>";
+  const row = (arr, h) => arr.find(r => r.h === h) || {};
+  document.getElementById("t-dm").innerHTML = `<thead><tr><th>Тест Диболда-Мариано, p</th>${H.map(h => `<th>h = ${h}</th>`).join("")}</tr></thead><tbody>
+    <tr><td>против Prophet</td>${H.map(h => `<td>${pv(row(D.dm, h).p)}</td>`).join("")}</tr>
+    <tr><td>против Prophet + профиль</td>${H.map(h => `<td>${pv(row(D.dm_seasonal, h).p)}</td>`).join("")}</tr></tbody>`;
+});
+
+// 5. выбор
+S("Выбор лучшей", "Лучшую модель выбирает процедура, а не одна цифра", `
+  <div class="cols">
+    <div class="stack"><h3>Шаг 1. Набор лучших моделей (Model Confidence Set)</h3>
+      <p class="note">Из 18 моделей по очереди исключается худшая, пока оставшиеся нельзя различить на уровне 10 %; бутстреп по МО.</p>
+      <table id="t-mcs"></table>
+      <p>На 1-3 месяца одна TimesFM 2.5 на локальной части значимо точнее всех, включая ансамбль; на 6 и 12 месяцев ансамбль в наборе лучших.</p></div>
+    <div class="stack"><h3>Шаг 2. Сведение 24 ранжирований «горизонт × категория»</h3>
+      <table id="t-rank"></table>
+      <p>Ансамбль первый при всех четырёх правилах теории выбора и побеждает каждую модель в парном сравнении (победитель Кондорсе). Пороговое правило (Алескеров, Чистяков, Калягин) наказывает за последние места - ансамбль не проваливается нигде.</p></div>
+  </div>`, () => {
+  document.getElementById("t-mcs").innerHTML = `<thead><tr><th>h</th><th style="text-align:left">в наборе лучших</th></tr></thead><tbody>` +
+    H.map(h => `<tr><td style="white-space:nowrap">h = ${h}</td><td style="text-align:left;white-space:normal;font-family:var(--font-body)">${D.mcs.filter(r => r.h === h).sort((a, b) => a.MAE - b.MAE).map(r => LABEL[r.model] || r.model).join(", ")}</td></tr>`).join("") + "</tbody>";
+  const rk = D.rank.slice(0, 5).concat(D.rank.filter(r => r.model === "prophet")), rules = ["Борда", "Коупленд", "Кемени", "пороговое"];
+  document.getElementById("t-rank").innerHTML = `<thead><tr><th>Модель</th>${rules.map(r => `<th>${r}</th>`).join("")}</tr></thead><tbody>` +
+    rk.map(r => `<tr class="${r.model === "ensemble" ? "ours" : r.model === "prophet" ? "base" : ""}"><td>${LABEL[r.model] || r.model}</td>${rules.map(k => `<td>${r[k] == null ? "-" : Math.round(r[k])}</td>`).join("")}</tr>`).join("") + "</tbody>";
+});
+
+// 6. интервалы
+if (D.intervals) S("Неопределённость", "Интервалы прогноза: сколько раз факт попал внутрь", `
+  <div class="cols w">
+    <div class="stack"><table id="t-iv"></table>
+      <p class="note">Подвыборка 600 рядов (по 100 на категорию) × 12 точек начала: на ней Prophet строит свои интервалы. Ансамбль: дисперсия местной части из фильтра Калмана плюс ошибка правил траектории на истории национального ряда до точки начала; ничего не подбирается по тесту.</p></div>
+    <div class="stack" id="iv-text"></div>
+  </div>`, () => {
+  const g = (m, rows, lvl, h, k) => (D.intervals.find(r => r.model === m && r.rows === rows && r.level === lvl && r.h === h) || {})[k];
+  const line = (lbl, m, rows, lvl, k, f, cls) => `<tr class="${cls}"><td>${lbl}</td>${H.map(h => `<td>${f(g(m, rows, lvl, h, k))}</td>`).join("")}</tr>`;
+  const pc = v => v == null ? "-" : Math.round(v * 100) + " %";
+  document.getElementById("t-iv").innerHTML = `<thead><tr><th>Покрытие</th>${H.map(h => `<th>h = ${h}</th>`).join("")}</tr></thead><tbody>` +
+    line("Ансамбль, 80 % интервал", "ensemble", "подвыборка", 0.8, "coverage", pc, "ours") +
+    line("Prophet, 80 % интервал", "prophet", "подвыборка", 0.8, "coverage", pc, "base") +
+    line("Ансамбль, 95 % интервал", "ensemble", "подвыборка", 0.95, "coverage", pc, "ours") +
+    line("Prophet, 95 % интервал", "prophet", "подвыборка", 0.95, "coverage", pc, "base") +
+    `<tr><td colspan="5" style="font-family:var(--font-data);font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;padding-top:14px">Интервальная оценка Винклера, 95 %, руб. (меньше - лучше)</td></tr>` +
+    line("Ансамбль", "ensemble", "подвыборка", 0.95, "winkler", v => ru(v), "ours") +
+    line("Prophet", "prophet", "подвыборка", 0.95, "winkler", v => ru(v), "base") + "</tbody>";
+  const cat = (h, c) => ((D.intervals_cat || []).find(r => r.h === h && r.category === c) || {}).coverage;
+  document.getElementById("iv-text").innerHTML = `<ul>
+    <li><b>Наш интервал честный на 1-3 месяца:</b> 80 %-интервал накрывает факт в ${pc(g("ensemble", "все", 0.8, 1, "coverage"))} и ${pc(g("ensemble", "все", 0.8, 3, "coverage"))} случаев (все ряды).</li>
+    <li><b>На 6-12 месяцев он осторожнее, чем нужно</b> (${pc(g("ensemble", "все", 0.8, 6, "coverage"))} и ${pc(g("ensemble", "все", 0.8, 12, "coverage"))}): ошибку траектории оцениваем по истории ряда с 2022 г., где были крупные шоки.</li>
+    <li><b>Интервалы Prophet слишком узкие:</b> 80 %-интервал накрывает факт лишь в ${H.map(h => pc(g("prophet", "подвыборка", 0.8, h, "coverage"))).join(" / ")} случаев.</li>
+    <li><b>Слабое место:</b> «Продовольствие» на 3-6 месяцев (покрытие ${pc(cat(3, "Продовольствие"))} и ${pc(cat(6, "Продовольствие"))}).</li></ul>`;
+});
+
+// 7. фундаментальные модели
+S("Фундаментальные модели", "Chronos-2, TimesFM 2.5 и TiRex работают внутри разложения", `
+  <div class="cols">
+    <div class="stack"><h3>MAE на 12 месяцев, руб.</h3><svg class="chart" id="c-fm"></svg></div>
+    <div class="stack">
+      <ul>
+        <li><b>На сыром ряде</b> 12-23 месяца контекста: декабрьский пик модель принимает за тренд и на h = 12 ошибается хуже наивной.</li>
+        <li><b>На локальной части</b> (лог минус общая траектория) TimesFM 2.5 - лучшая одиночная модель на h = 1-6: ${H.slice(0, 3).map(h => ru(mae("timesfm_local", h))).join(" / ")} ₽.</li>
+        <li><b>Дообучение Chronos-2</b> (LoRA, своя копия на каждую точку начала, только прошлые данные) снижает MAE на 0,5-4,9 %; значимо на h ≥ 3.</li>
+        <li><b>TiRex</b> на подвыборке 2 995 рядов - между TimesFM и Chronos-2.</li>
+        <li>Обе модели на локальной части входят в ансамбль; состав не менялся после TiRex и дообучения.</li>
+      </ul></div>
+  </div>`, () => {
+  const rows = [["timesfm", "TimesFM 2.5, сырой ряд", css("--soft")], ["chronos2", "Chronos-2, сырой ряд", css("--soft")], ["prophet", "Prophet", css("--base")],
+    ["chronos2_local", "Chronos-2, локальная часть", css("--model")], ["chronos2_ft_local", "Chronos-2 дообученный", css("--model")], ["timesfm_local", "TimesFM 2.5, локальная часть", css("--model")], ["ensemble", "Ансамбль", css("--good")]]
+    .map(([m, l, c]) => ({ label: l, v: mae(m, 12), color: c }));
+  barChart(document.getElementById("c-fm"), { W: 620, rows, max: Math.max(...rows.map(r => r.v)) * 1.05, fmt: v => ru(v) });
+});
+
+// 8. детекторы
+S("Структурные сдвиги", "Детекторы сравниваются при одинаковой доле ложных тревог", `
+  <div class="cols w">
+    <div class="stack"><h3>Полнота при 5 % ложных тревог, 5 повторов, 95 % интервал</h3><svg class="chart" id="c-det"></svg></div>
+    <div class="stack">
+      <p>В 1 800 настоящих рядов вставлены ступеньки 10, 20 и 30 % в случайный месяц. Порог каждого детектора подобран так, чтобы ложная тревога была у одинаковой доли чистых рядов, и только потом сравнивается полнота.</p>
+      <ul>
+        <li>CUSUM не подходит: уровни МО блуждают, «стабильного процесса» нет.</li>
+        <li>Вычитание 10 соседей по дорогам помогает каждому детектору: общий шум местности уходит.</li>
+        <li>Выбор тем же сведением ранжирований по 63 клеткам: LR-тест относительно соседей с новостями первый при всех четырёх правилах.</li>
+      </ul></div>
+  </div>`, () => {
+  const order = ["ssm_lr_spatial_news", "bocpd_spatial", "ssm_lr_news", "ssm_lr_spatial", "bocpd_news", "bocpd", "pelt", "ssm_lr", "cusum"];
+  const rows = order.map(d => D.detect.find(r => r.detector === d)).filter(Boolean).map(r => ({ label: DET[r.detector], v: r.recall, ci: r.recall_ci, color: r.detector.startsWith("ssm_lr") ? css("--alert") : css("--soft") }));
+  barChart(document.getElementById("c-det"), { W: 680, rows, max: 0.6, fmt: v => ru(v, 2) });
+});
+
+// 9. два канала
+S("Реальные данные", "Два канала отвечают на разные вопросы", `
+  <div class="cols">
+    <div class="stack"><table id="t-lab"></table>
+      <p class="note">Все полные ряды. Метка задним числом: среднее за 3 месяца после отличается от 3 месяцев до больше чем на 6 единиц шума ряда; детектор работает онлайн и метку не видит.</p></div>
+    <div class="stack">
+      <p>Обычный канал точен на сдвигах самого ряда, канал соседей - на сдвигах относительно соседей: по 84-85 % тревог при 1 % месяцев с тревогой.</p>
+      <ul>
+        <li>Сработал только обычный канал - шок местности: паводок по бассейну, региональная мера, приход маркетплейса в район.</li>
+        <li>Сработал канал соседей - что-то своё у МО: закрылся или открылся крупный объект.</li>
+        <li>Поэтому в мониторинге два канала, а не один общий: объединение «любой из двух» хуже каждого на своей задаче.</li>
+      </ul></div>
+  </div>`, () => {
+  const L = D.labeled, g = (lab, det, a, k) => (L.find(r => r.labels === lab && r.detector === det && r.alarm_rate === a) || {})[k];
+  const rates = [0.01, 0.02, 0.05], name = { ssm_lr: "сам ряд", ssm_lr_spatial: "относительно соседей", ssm_lr_combo: "любой из двух" };
+  const labs = [...new Set(L.map(r => r.labels))];
+  document.getElementById("t-lab").innerHTML = `<thead><tr><th>Метки / канал</th>${rates.map(a => `<th>${Math.round(a * 100)} % тревог</th>`).join("")}</tr></thead><tbody>` +
+    labs.map(lab => `<tr><td colspan="4" style="font-family:var(--font-data);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">${lab}</td></tr>` +
+      Object.keys(name).map(det => { const best = (lab.includes("сосед") && det === "ssm_lr_spatial") || (!lab.includes("сосед") && det === "ssm_lr");
+        return `<tr class="${best ? "ours" : ""}"><td>${name[det]}</td>${rates.map(a => `<td>${ru(g(lab, det, a, "precision"), 2)} / ${ru(g(lab, det, a, "recall"), 2)}</td>`).join("")}</tr>`; }).join("")).join("") +
+    `</tbody>`;
+});
+
+// 10. новости
+S("Новости", "Новость - подсказка детектору, а не сигнал сдвига", `
+  <div class="cols">
+    <div class="stack"><h3>Каталог проверенных событий</h3>
+      <p>37 событий по 51 МО (паводки 2024 г., тайфун в Приморье, пожары, «Крокус»). Ключи - те же territory_id и месяц, что в панели; используется только то, что опубликовано к точке начала (announce_date).</p>
+      <table id="t-ev"></table></div>
+    <div class="stack"><h3>Поток GDELT по 811 МО: опережения нет</h3>
+      <table id="t-gd"></table>
+      <p class="note">Во сколько раз чаще сдвиг рядом со всплеском сообщений о бедствиях, с поправкой на календарь и 95 % интервалом (бутстреп по МО). Интервалы задевают 1: сырой поток отражает внимание СМИ, а не экономический шок.</p></div>
+  </div>`, () => {
+  const E = D.events;
+  document.getElementById("t-ev").innerHTML = `<thead><tr><th>Ряды событий с тревогой за 3 мес.</th><th>все (${E.rows})</th><th>сдвиг > 10 % (${E.big})</th></tr></thead><tbody>` +
+    [["ssm_lr", "LR-тест"], ["ssm_lr_news", "LR-тест + новость"], ["bocpd", "BOCPD"], ["pelt", "PELT"], ["cusum", "CUSUM"]].map(([k, l]) =>
+      `<tr class="${k === "ssm_lr_news" ? "ours" : ""}"><td>${l}</td><td>${ru(E[k].all * 100, 1)} %</td><td>${ru(E[k].big * 100, 1)} %</td></tr>`).join("") + "</tbody>";
+  const lag = { "-2": "за 2 мес.", "-1": "за 1 мес.", "0": "тот же месяц", "1": "через 1 мес.", "2": "через 2 мес." };
+  const own = D.gdelt.filter(r => r.scope === "свои новости МО");
+  document.getElementById("t-gd").innerHTML = `<thead><tr><th>Новость относительно сдвига</th><th>подъём</th><th>95 % интервал</th></tr></thead><tbody>` +
+    own.map(r => `<tr><td>${lag[String(r.lag_news_vs_shift)] || r.lag_news_vs_shift}</td><td>${ru(r.lift, 2)}</td><td>${ru(r.ci_low, 2)} … ${ru(r.ci_high, 2)}</td></tr>`).join("") + "</tbody>";
+});
+
+// 11-13. галерея
+const CASE_TEXT = {
+  tobol: "Расходы на здоровье упали на 30 % к своей категории и восстановились только к концу года. LR-тест с новостью поднял тревогу в месяц паводка, без новости - через два месяца. Канал соседей молчит: паводок задел всю округу.",
+  orsk: "Расходы не упали, а выросли: факт выше прогноза из марта на 4-10 % (вероятно, выплаты пострадавшим; по данным не проверить). LR-тест с новостью дал тревогу в мае - сигнал пересмотреть прогноз по МО.",
+  krokus: "Траты жителей Красногорска на общепит изменились на 4 % к своей категории, в пределах шума; тревоги нет ни в одном канале. Новость повышает вероятность сдвига, но решают данные.",
+  ustishim: "Маркетплейсы выросли почти в 5 раз за три месяца; новости нет (похоже на новый пункт выдачи, мы не проверяли). Обычный канал тревожит с первой ступеньки в июле, канал соседей молчит: так же росли и соседи - шок местности.",
+  severny: "Собственный ряд дрейфует относительно страны весь год, и обычный канал тревожит постоянно - так же дрейфует вся местность. В августе 2024 г. падение на четверть, и канал соседей даёт одну тревогу ровно в этом месяце: сдвиг самого МО.",
+};
+const CH = { ssm_lr: ["сам ряд", "--model"], ssm_lr_news: ["сам ряд + новость", "--alert"], ssm_lr_spatial: ["относительно соседей", "--good"] };
+function caseBlock(c) {
+  const id = "cs-" + c.id;
+  return `<div class="case"><span class="tag">${c.kind}</span><h3>${c.title}</h3><p class="note">${c.mo}, ${c.category.toLowerCase()}${c.event ? `; событие ${c.event.month}, известно с ${c.event.announce_date}` : "; новости в каталоге нет"}</p>
+    <svg class="chart" id="${id}-s"></svg><svg class="chart" id="${id}-d"></svg>
+    <p>${CASE_TEXT[c.id] || ""}</p>
+    <p class="facts">первая тревога: ${Object.keys(CH).map(ch => `${CH[ch][0]} ${c.alarm[ch] || "нет"}`).join(" · ")}</p></div>`;
+}
+function drawCase(c) {
+  const M = D.cases.months, oi = M.indexOf(c.origin), ti = M.indexOf(c.event ? c.event.month : c.month), id = "cs-" + c.id;
+  const fser = m => { const v = Array(M.length).fill(null); v[oi] = c.actual[oi]; c.forecast[m].forEach((f, k) => { if (oi + 1 + k < M.length) v[oi + 1 + k] = f; }); return v; };
+  lineChart(document.getElementById(id + "-s"), { W: 560, Hh: 150, xLabels: M.map(m => m.slice(2)), yFmt: v => ru(v), markX: ti, every: 3, series: [
+    { values: c.actual, color: css("--ink"), width: 2.2, dots: true }, { values: fser("ensemble"), color: css("--model"), width: 2.6 }, { values: fser("prophet"), color: css("--base"), width: 1.8, dash: "5 4" }] });
+  const ser = Object.keys(CH).map(ch => ({ values: c.scores[ch].map(v => v == null ? null : Math.min(v / c.thresholds[ch], 4)), color: css(CH[ch][1]), width: 1.8 }));
+  ser.push({ values: M.map(() => 1), color: css("--soft"), width: 1, dash: "3 3" });
+  lineChart(document.getElementById(id + "-d"), { W: 560, Hh: 92, xLabels: M.map(m => m.slice(2)), yFmt: v => ru(v, 1), yMin: 0, markX: ti, every: 3, series: ser });
+}
+const caseLegend = legend([["факт", css("--ink")], ["ансамбль из месяца до события", css("--model")], ["Prophet", css("--base"), true], ["событие", css("--alert"), true]]) +
+  legend([...Object.values(CH).map(([n, c]) => ["LR / порог: " + n, css(c)]), ["порог", css("--soft"), true]]);
+const C = D.cases.cases;
+for (let k = 0; k < C.length; k += 2) {
+  const pair = C.slice(k, k + 2);
+  S("Галерея случаев", k === 0 ? "Что видели прогноз и детектор в реальных историях" : "Галерея случаев: продолжение", `
+    <div class="cols">${pair.map(caseBlock).join("")}${pair.length === 1 ? `<div class="case"><h3>Как читать графики</h3><ul style="font-size:15px">
+      <li>Верхний: факт (руб. на жителя), прогноз ансамбля и Prophet из последнего месяца до события; красный пунктир - месяц события или сдвига.</li>
+      <li>Нижний: статистика LR-теста ступеньки, делённая на порог, в трёх каналах. Выше 1 - тревога; порог даёт тревогу у 5 % случайных рядов за весь период.</li>
+      <li>Детектор онлайн: значение в месяц t считается только по данным до t. Первые 6 месяцев - опорный период.</li>
+      <li>Каналы: сам ряд; он же с новостью из каталога (априорная вероятность сдвига ×25); ряд «МО минус 10 соседей по дорогам».</li></ul></div>` : ""}</div>${caseLegend}`, () => pair.forEach(drawCase));
+}
+
+// национальный сдвиг и вне выборки
+S("Вне выборки", "Проверка на 2025-2026 годах, которых модель не видела", `
+  <div class="cols">
+    <div class="stack"><table id="t-oos"></table>
+      <p class="note">Те же правила общей траектории прогнозируют сам национальный ряд СберИндекса (5 рядов) от каждой точки начала; ошибка |log прогноз − log факт| × 100. Правила выбирались по 2023-2024 гг.</p>
+      <ul><li>На 1-3 месяца правила держатся вне выборки и в 1,5-2,3 раза точнее Prophet.</li>
+        <li>На 12 месяцев Prophet на семи годах ряда точнее: правила переносят рост прошлого года, а в 2025 г. рост замедлился. Это главное направление улучшения.</li></ul></div>
+    <div class="stack"><h3>${D.cases.national.title}</h3><svg class="chart" id="c-nat"></svg>
+      <p id="nat-text" style="font-size:14px"></p>
+      <p class="note" id="fw-text"></p></div>
+  </div>`, () => {
+  const per = [...new Set(D.national_oos.map(r => r.period))], last = per[per.length - 1];
+  const g = (p, m, h) => (D.national_oos.find(r => r.period === p && r.rule === m) || {})[h];
+  const rn = [["combo", "Среднее правил (в модели)", "ours"], ["airline", "SARIMA нац. ряда", ""], ["prophet", "Prophet, история с 2018 г.", "base"], ["naive", "Наивная", ""]];
+  document.getElementById("t-oos").innerHTML = `<thead><tr><th>Ошибка, %, 2025-2026</th>${H.map(h => `<th>h = ${h}</th>`).join("")}</tr></thead><tbody>` +
+    rn.map(([m, l, cls]) => `<tr class="${cls}"><td>${l}</td>${H.map(h => `<td>${ru(g(last, m, h), 1)}</td>`).join("")}</tr>`).join("") +
+    `<tr><td>то же правило на проверке 2024</td>${H.map(h => `<td>${ru(g(per[1], "combo", h), 1)}</td>`).join("")}</tr></tbody>`;
+  const n = D.cases.national, months = n.months, idx = m => months.indexOf(m), fc = Array(months.length).fill(null);
+  fc[idx(n.origin)] = n.actual[idx(n.origin)]; n.forecast.months.forEach((m, k) => { if (idx(m) >= 0) fc[idx(m)] = n.forecast.values[k]; });
+  lineChart(document.getElementById("c-nat"), { W: 560, Hh: 220, xLabels: months.map(m => m.slice(2)), yFmt: v => ru(v), markX: idx("2025-01"), every: 4,
+    series: [{ values: n.actual, color: css("--ink"), width: 2.2, dots: true }, { values: fc, color: css("--model"), width: 2.6 }] });
+  const dec = n.actual[idx("2024-12")], jan = n.actual[idx("2025-01")];
+  document.getElementById("nat-text").textContent = `Общепит, млрд руб. в месяц. В январе 2025 г. ряд вырос на ${Math.round((jan / dec - 1) * 100)} % к декабрю, хотя раньше январь был ниже декабря на 6-23 %; правила из декабря 2024 г. (синяя линия) этого не ждали. Похоже на смену границ категории или методики - структурный сдвиг на уровне страны.`;
+  const F = D.forward;
+  document.getElementById("fw-text").textContent = `Прогноз ансамбля на 2025 г. от декабря 2024 г. заморожен: ${ru(F.rows)} значений «МО × категория × месяц», SHA-256 ${F.sha256.slice(0, 16)}… (forecast_2025/ в репозитории) - его можно будет сверить с данными МО за 2025 г.`;
+});
+
+// ограничения и воспроизводимость
+S("Итог", "Что проверено, что нет, и как всё повторить", `
+  <div class="cols">
+    <div class="stack"><h3>Ограничения</h3><ul>
+      <li>24 месяца: горизонт 12 проверяется одной точкой начала (2023-12 → 2024-12).</li>
+      <li>Рост общей траектории - главная оставшаяся ошибка (маркетплейсы 2024 г., замедление 2025 г.).</li>
+      <li>Курской и Белгородской областей в данных нет; каталог событий небольшой (37 событий).</li>
+      <li>Сдвиги около 10 % в шумных рядах мелких МО не отличить от шума месяца.</li>
+      <li>На 1-3 месяца одна TimesFM на локальной части точнее ансамбля на 1-3 руб. - упрощённый вариант решения.</li></ul></div>
+    <div class="stack"><h3>Воспроизводимость</h3>
+      <div class="formula" style="font-size:14px">python -m sbi.run_all          # всё с нуля
+python -m pytest -q tests      # 10 тестов без утечки будущего
+python -m sbi.selection        # выбор лучшей модели
+python -m sbi.cases            # галерея случаев
+python -m sbi.deck             # эта презентация</div>
+      <ul><li>Все пути и гиперпараметры - в config.yaml, seed 42, Python 3.12.</li>
+        <li>Таблицы отчёта, лендинг и эти слайды строятся из одних и тех же файлов результатов.</li>
+        <li>Код, отчёт, прогноз на 2025 г.: github.com/veshidar-dot/sberindex-2026</li></ul></div>
+  </div>`);
+
+// сборка
+const deck = document.getElementById("deck");
+slides.forEach((s, i) => {
+  const sec = document.createElement("section");
+  sec.className = "slide";
+  sec.innerHTML = (s.title === null ? s.body : `<span class="eyebrow">${s.eyebrow}</span><h2>${s.title}</h2>${s.body}`) +
+    `<div class="foot"><span>СберИндекс 2026 · Прогнозирование</span><span>${i + 1} / ${slides.length}</span></div>`;
+  deck.appendChild(sec);
+});
+slides.forEach(s => s.after && s.after());
+</script>
+</body>
+</html>

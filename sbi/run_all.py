@@ -32,6 +32,8 @@ STEPS = [
     ["sbi.selection"],
     ["sbi.national_oos"],
     ["sbi.forward"],
+    ["sbi.cases"],
+    ["sbi.intervals"],
     ["sbi.export_landing"],
 ]
 

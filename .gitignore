@@ -4,3 +4,4 @@ __pycache__/
 .ipynb_checkpoints/
 config.local.yaml
 out/
+docs/deck/presentation.html

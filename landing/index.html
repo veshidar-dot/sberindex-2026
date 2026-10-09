@@ -162,6 +162,9 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     </div>
     <div class="scroll"><table id="models-table"></table></div>
     <p class="note" id="dm-note"></p>
+    <h3 style="margin-top:12px">Интервалы прогноза: сколько раз факт попал внутрь</h3>
+    <div class="scroll"><table id="iv-table"></table></div>
+    <p class="note">Подвыборка 600 рядов × 12 точек начала. Интервал ансамбля: дисперсия местной части из фильтра Калмана плюс ошибка правил траектории на истории национального ряда до точки начала. На 1-3 месяца он откалиброван, на 6-12 месяцев шире нужного; интервалы Prophet слишком узкие.</p>
   </section>
 
   <section id="selection">
@@ -214,6 +217,28 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     </div>
   </section>
 
+  <section id="gallery">
+    <span class="eyebrow">Галерея случаев</span>
+    <h2>Что видели прогноз и детектор в реальных историях</h2>
+    <p class="prose">Шесть случаев, по одному на каждую типичную ситуацию. Верхний график: факт, прогноз ансамбля и Prophet из месяца перед событием. Нижний: статистика LR-теста в трёх каналах, делённая на порог (выше 1 - тревога; порог даёт тревогу у 5 % случайных рядов за весь период). Детектор видит только данные до текущего месяца.</p>
+    <div class="controls"><span class="seg" id="g-seg" style="flex-wrap:wrap; max-width:100%"></span></div>
+    <div class="two">
+      <div>
+        <svg id="g-series" class="chart" viewBox="0 0 520 260" role="img" aria-label="Факт и прогнозы"></svg>
+        <div class="legend" id="g-series-legend"></div>
+        <svg id="g-score" class="chart" viewBox="0 0 520 200" role="img" aria-label="Статистика детектора относительно порога"></svg>
+        <div class="legend" id="g-score-legend"></div>
+      </div>
+      <div>
+        <span class="tag" id="g-kind"></span>
+        <h3 id="g-title" style="margin:8px 0"></h3>
+        <p class="note" id="g-meta"></p>
+        <p class="prose" id="g-text"></p>
+        <div class="scroll"><table id="g-facts"></table></div>
+      </div>
+    </div>
+  </section>
+
   <section id="cases">
     <span class="eyebrow">Реальные примеры</span>
     <h2>Паводки 2024 года, тайфун в Приморье и другие события</h2>
@@ -252,7 +277,7 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
   </section>
 
   <footer>
-    <span>Код, конфигурация и методологический отчёт: <a href="https://github.com/veshidar-dot/sberindex-2026" target="_blank" rel="noopener">github.com/veshidar-dot/sberindex-2026</a></span>
+    <span>Код, конфигурация и методологический отчёт: <a href="https://github.com/veshidar-dot/sberindex-2026" target="_blank" rel="noopener">github.com/veshidar-dot/sberindex-2026</a> · <a href="https://github.com/veshidar-dot/sberindex-2026/blob/main/docs/presentation.pdf" target="_blank" rel="noopener">презентация, PDF</a></span>
     <span>Данные: СберИндекс, «Потребительские безналичные расходы на уровне МО», «Потребительские расходы», CC BY-SA 4.0.</span>
   </footer>
 </div>
@@ -351,8 +376,8 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     // выбор лучшей
     if (D.selection_mcs) {
       const sets = H.map(h => D.selection_mcs.filter(r => r.h === h && r.in_mcs).sort((a, b) => a.MAE - b.MAE).map(r => LABEL[r.model] || r.model));
-      document.getElementById("mcs-table").innerHTML = `<thead><tr><th>Горизонт</th><th>Набор лучших моделей (10 %)</th></tr></thead><tbody>` +
-        H.map((h, k) => `<tr class="${sets[k].includes(LABEL.ensemble) ? "ours" : ""}"><td>h = ${h}</td><td>${sets[k].join(", ")}</td></tr>`).join("") + "</tbody>";
+      document.getElementById("mcs-table").innerHTML = `<thead><tr><th style="white-space:nowrap">Горизонт</th><th style="text-align:left;white-space:normal">Набор лучших моделей (10 %)</th></tr></thead><tbody>` +
+        H.map((h, k) => `<tr class="${sets[k].includes(LABEL.ensemble) ? "ours" : ""}"><td style="white-space:nowrap">h = ${h}</td><td style="text-align:left;white-space:normal;font-family:var(--font-body)">${sets[k].join(", ")}</td></tr>`).join("") + "</tbody>";
     }
     if (D.selection_rank_forecast) {
       const rk = D.selection_rank_forecast.slice(0, 6).concat(D.selection_rank_forecast.filter(r => r.model === "prophet"));
@@ -379,6 +404,17 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     if (D.forward) {
       document.getElementById("fw-note").textContent = `Прогноз ансамбля на все 12 месяцев 2025 года от декабря 2024 года заморожен: ${D.forward.rows.toLocaleString("ru-RU")} значений «МО × категория × месяц», SHA-256 ${D.forward.sha256.slice(0, 16)}…, создан ${D.forward.created.slice(0, 10)}. Его можно будет сверить с данными МО за 2025 год, когда СберИндекс их опубликует.`;
     }
+
+    // интервалы
+    if (D.intervals) {
+      const g = (m, lvl, h) => (D.intervals.find(r => r.model === m && r.rows === "подвыборка" && r.level === lvl && r.h === h) || {}).coverage;
+      const rowsIv = [["ensemble", 0.8, "Ансамбль, 80 % интервал", "ours"], ["prophet", 0.8, "Prophet, 80 % интервал", "base"], ["ensemble", 0.95, "Ансамбль, 95 % интервал", "ours"], ["prophet", 0.95, "Prophet, 95 % интервал", "base"]];
+      document.getElementById("iv-table").innerHTML = `<thead><tr><th>Покрытие</th>${H.map(h => `<th>h = ${h}</th>`).join("")}</tr></thead><tbody>` +
+        rowsIv.map(([m, l, name, cls]) => `<tr class="${cls}"><td>${name}</td>${H.map(h => `<td>${g(m, l, h) == null ? "-" : Math.round(g(m, l, h) * 100) + " %"}</td>`).join("")}</tr>`).join("") + "</tbody>";
+    }
+
+    // галерея случаев
+    if (D.cases) drawGallery(D.cases);
 
     // детекция
     const ds = D.detection_synthetic || [];
@@ -438,6 +474,63 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
       <tr><td>Прогноз на рядах событий (каталог), MAE h = 1</td><td>${D.news_effect ? Math.round(D.news_effect.panel_ssm) + " ₽" : "-"}</td><td>${D.news_effect ? Math.round(D.news_effect.panel_ssm_news) + " ₽" : "-"}</td></tr>
       <tr><td>Поток GDELT в LightGBM, MAE h = 3, все ряды</td><td>${fmt(get("lgbm", 3, "Итого", "MAE"), "MAE")} ₽</td><td>${fmt(get("lgbm_news", 3, "Итого", "MAE"), "MAE")} ₽</td></tr></tbody>`;
     function share(k) { const r = D.detection_real_events || []; return r.length ? (r.filter(x => x[k] >= 0).length / r.length * 100).toFixed(1).replace(".", ",") + " %" : "-"; }
+  }
+
+  // разбор случаев: тексты к числам из out/cases.json (sbi.cases)
+  const CASE_TEXT = {
+    tobol: "Паводок на Тоболе в апреле 2024 года. Расходы жителей Звериноголовского округа на здоровье упали на 30 % к своей категории и восстановились только к концу года. LR-тест с новостью о паводке поднял тревогу в апреле, в месяц события; без новости тот же тест увидел сдвиг только в июне. Канал соседей молчит: паводок задел всю округу, а не один МО.",
+    orsk: "Прорыв дамбы 5 апреля 2024 года. Расходы жителей Орска не упали, а выросли: весной и летом факт был выше прогноза ансамбля из марта на 4-10 % (вероятная причина - выплаты пострадавшим и восстановление имущества, по этим данным её не проверить). Prophet с линейным трендом ошибся меньше. LR-тест с новостью поднял тревогу в мае: это сигнал пересмотреть прогноз по этому МО.",
+    krokus: "Теракт в «Крокус Сити Холле» 22 марта 2024 года и закрытие комплекса. Расходы жителей Красногорска на общепит за три месяца изменились на 4 % к своей категории, в пределах обычного шума, и тревоги нет ни в одном канале. Новость повышает вероятность сдвига, но решает данные.",
+    ustishim: "Осенью 2023 года траты на маркетплейсы в Усть-Ишимском районе выросли почти в 5 раз за три месяца. Новости об этом нет; похоже на открытие пункта выдачи заказов (в открытых источниках мы это не проверяли). Обычный канал тревожит с июля, с первой ступеньки на 50 %. Относительно соседей тревоги нет: похожий рост был и у них, это шок местности, а не одного МО.",
+    severny: "В собственном ряде транспорта Северного района тревога держится с декабря 2023 года: ряд шумный и дрейфует относительно страны. Относительно соседей в это время тревоги нет, то есть такой дрейф общий для местности. В августе 2024 года расходы упали ещё на четверть и остались на новом уровне. Канал соседей поднял одну тревогу, ровно в этом месяце: это сдвиг самого МО. Ансамбль из июля его не предвидел.",
+  };
+  const CH = { ssm_lr: "сам ряд", ssm_lr_news: "сам ряд + новость", ssm_lr_spatial: "относительно соседей" };
+
+  function drawGallery(G) {
+    const seg = document.getElementById("g-seg");
+    const items = [...G.cases.map(c => ({ id: c.id, label: c.title })), { id: "national", label: "Общепит по стране" }];
+    let cur = items[0].id;
+    seg.innerHTML = items.map(it => `<button type="button" data-id="${it.id}" aria-pressed="${it.id === cur}">${it.label}</button>`).join("");
+    const pct = v => (v > 0 ? "+" : "") + Math.round((Math.exp(v) - 1) * 100) + " %";
+    const draw = () => {
+      const svgS = document.getElementById("g-series"), svgD = document.getElementById("g-score");
+      if (cur === "national") {
+        const n = G.national, months = n.months, idx = m => months.indexOf(m);
+        const fc = Array(months.length).fill(null); fc[idx(n.origin)] = n.actual[idx(n.origin)];
+        n.forecast.months.forEach((m, k) => { if (idx(m) >= 0) fc[idx(m)] = n.forecast.values[k]; });
+        lineChart(svgS, { W: 520, Hh: 260, xLabels: months.map(m => m.slice(2)), yFmt: v => Math.round(v), series: [
+          { values: n.actual, color: css("--ink"), width: 2.5, dots: true }, { values: fc, color: css("--model"), width: 3 }], markX: idx("2025-01") });
+        legend(document.getElementById("g-series-legend"), [["Факт, млрд руб. в месяц", css("--ink")], ["Прогноз правил общей траектории из 2024-12", css("--model")]]);
+        svgD.innerHTML = ""; document.getElementById("g-score-legend").innerHTML = "";
+        document.getElementById("g-kind").textContent = "сдвиг на уровне страны";
+        document.getElementById("g-title").textContent = n.title;
+        document.getElementById("g-meta").textContent = "Национальный ряд СберИндекса «Потребительские расходы», общественное питание.";
+        const dec = n.actual[idx("2024-12")], jan = n.actual[idx("2025-01")];
+        document.getElementById("g-text").textContent = `В январе 2025 года национальный ряд общепита вырос на ${Math.round((jan / dec - 1) * 100)} % к декабрю, хотя в 2019-2024 годах январь был ниже декабря на 6-23 %, а сумма за 2025 год на 49 % больше, чем за 2024 год. Правила общей траектории из декабря 2024 года этого не ждали. Похоже на изменение границ категории или методики: это структурный сдвиг на уровне страны. Данные МО за 2025 год покажут, затронул ли он все муниципалитеты одинаково.`;
+        document.getElementById("g-facts").innerHTML = "";
+        return;
+      }
+      const c = G.cases.find(x => x.id === cur), M = G.months, oi = M.indexOf(c.origin), ti = M.indexOf(c.event ? c.event.month : c.month);
+      const fser = m => { const v = Array(M.length).fill(null); v[oi] = c.actual[oi]; c.forecast[m].forEach((f, k) => { if (oi + 1 + k < M.length) v[oi + 1 + k] = f; }); return v; };
+      lineChart(svgS, { W: 520, Hh: 260, xLabels: M.map(m => m.slice(2)), yFmt: v => Math.round(v).toLocaleString("ru-RU"), markX: ti, series: [
+        { values: c.actual, color: css("--ink"), width: 2.5, dots: true }, { values: fser("ensemble"), color: css("--model"), width: 3 }, { values: fser("prophet"), color: css("--base"), width: 2, dash: "5 4" }] });
+      legend(document.getElementById("g-series-legend"), [["Факт, руб. на жителя", css("--ink")], ["Ансамбль из " + c.origin, css("--model")], ["Prophet из " + c.origin, css("--base"), true], ["Событие или сдвиг", css("--alert"), true]]);
+      const col = { ssm_lr: css("--model"), ssm_lr_news: css("--alert"), ssm_lr_spatial: css("--good") };
+      const ser = Object.keys(CH).map(ch => ({ values: c.scores[ch].map(v => v == null ? null : Math.min(v / c.thresholds[ch], 4)), color: col[ch], width: 2, dots: true }));
+      ser.push({ values: M.map(() => 1), color: css("--rule"), width: 1.5, dash: "3 3" });
+      lineChart(svgD, { W: 520, Hh: 200, xLabels: M.map(m => m.slice(2)), yFmt: v => v.toFixed(1), yMin: 0, series: ser, markX: ti });
+      legend(document.getElementById("g-score-legend"), [...Object.keys(CH).map(ch => [CH[ch], col[ch]]), ["порог", css("--rule"), true]]);
+      document.getElementById("g-kind").textContent = c.kind;
+      document.getElementById("g-title").textContent = c.title;
+      document.getElementById("g-meta").textContent = `${c.mo}, ${c.category.toLowerCase()}` + (c.event ? `. Событие из каталога: ${c.event.month}, известно с ${c.event.announce_date}.` : ". Новости в каталоге нет.");
+      document.getElementById("g-text").textContent = CASE_TEXT[c.id] || "";
+      const rows = [["Сдвиг к своей категории за 3 мес.", pct(c.shift_log)],
+        ...Object.keys(CH).map(ch => [`Первая тревога: ${CH[ch]}`, c.alarm[ch] || "нет"]),
+        ["Ошибка за 3 мес. после точки начала: ансамбль / Prophet", `${Math.round(c.mae_3m.ensemble).toLocaleString("ru-RU")} / ${Math.round(c.mae_3m.prophet).toLocaleString("ru-RU")} ₽`]];
+      document.getElementById("g-facts").innerHTML = "<tbody>" + rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("") + "</tbody>";
+    };
+    seg.onclick = ev => { const b = ev.target.closest("button"); if (!b) return; cur = b.dataset.id; seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); draw(); };
+    draw();
   }
 
   fetch("data.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(render).catch(err => {

@@ -129,10 +129,32 @@ selection:                            # выбор лучшей модели и 
            panel_ssm_chronos, panel_seasonal, lgbm, lgbm_news, chronos2, chronos2_cross, chronos2_local,
            chronos2_ft_local, timesfm, timesfm_local, ensemble]   # все модели на всей панели (TiRex - на подвыборке)
 
+intervals:                            # интервалы прогноза (sbi.intervals)
+  nat_from: "2022-12"                 # ошибки правил на нац. ряде - с тех же точек, что история в sbi.national_oos (SARIMA с 2021 г. нужно 2 года)
+  prophet_per_category: 100           # подвыборка для интервалов Prophet (600 рядов x 12 точек начала)
+  prophet_samples: 500                # выборок апостериорного прогноза Prophet для квантилей
+  n_jobs: 10
+
+deck:                                 # презентация в PDF (sbi.deck): печать headless Chrome, путь - в config.local.yaml при необходимости
+  browser: "C:/Program Files/Google/Chrome/Application/chrome.exe"
+
 forward:                              # прогноз вперёд ансамблем (sbi.forward), замораживается с SHA-256
   origin: "2024-12"                   # последний месяц панели
   horizon: 12
   file: ensemble_2025.csv.gz
+
+cases:                                # галерея реальных случаев (sbi.cases): ряд, прогноз до события, три канала детектора
+  items:
+    - {id: tobol, kind: "новость ускоряет тревогу", title: "Паводок на Тоболе", territory_id: 1339, category: "Здоровье", event: E2}
+    - {id: orsk, kind: "уровень вырос, а не упал", title: "Прорыв дамбы в Орске", territory_id: 1673, category: "Все категории", event: E1}
+    - {id: krokus, kind: "новость есть, сдвига нет", title: "Теракт в «Крокус Сити Холле»", territory_id: 1459, category: "Общественное питание", event: E5}
+    - {id: ustishim, kind: "сдвиг без новости", title: "Скачок маркетплейсов в Усть-Ишимском районе", territory_id: 1662, category: "Маркетплейсы", month: "2023-10"}
+    - {id: severny, kind: "шок самого МО, а не местности", title: "Транспорт в Северном районе", territory_id: 1702, category: "Транспорт", month: "2024-08"}
+  national:                           # сдвиг на уровне страны: прогноз правил от последнего месяца панели
+    title: "Общепит в национальном ряде, январь 2025 г."
+    series: catering
+    origin: "2024-12"
+    from: "2023-01"
 
 national_oos:                         # правила общей траектории на самом нац. ряде (sbi.national_oos)
   periods:                            # точки начала (последний известный месяц), включительно
