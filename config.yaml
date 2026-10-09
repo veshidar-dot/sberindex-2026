@@ -186,6 +186,18 @@ detection:
     alpha: 0.05
     top: 40
 
+news_crawl:                           # заголовки федеральных лент (sbi.news_crawl): только метаданные, в git не кладутся
+  sources: [lenta, interfax]
+  start: "2022-12-01"                 # месяц до панели: для неожиданности новостей нужен прошлый фон
+  end: "2024-12-31"
+  pause: 0.4                          # секунд между запросами одного потока
+  workers_per_source: 3
+  user_agent: "Mozilla/5.0 (compatible; research crawler, headlines only; github.com/veshidar-dot/sberindex-2026)"
+
+news_align:                           # согласование заголовков и постановлений о ЧС с данными (sbi.news_align)
+  detector_news: ["ЧС, паводок, пожар", "предприятия, увольнения", "все местные заголовки", "постановление о режиме ЧС"]
+  explain_rate: 0.01                  # доля самых сильных ряд-месяцев LR-теста, которые считаем тревогами
+
 gdelt:                                # поток новостей GDELT по МО (ref/news, MIT, см. SOURCES.md)
   ref_months: 6                       # опорный период для шума ряда (как в детекции на реальных данных)
   vars: [hazard, neg_docs, docs]      # бедствия (катастрофы+паводки+пожары), негативные, все сообщения

@@ -13,6 +13,22 @@
 | `event_registry_maloyan.csv` | `data/external/event_registry.csv` | maloyan/sberindex-2026-forecasting, `beebf5b365` |
 | `rosstat_retail_monthly.csv` | `data/external/rosstat_monthly.csv` | maloyan/sberindex-2026-forecasting, `beebf5b365` |
 | `event_registry_rav11l.csv` | `data/events/registry.csv` | rav11l/sberindex-shocks, `956bbf10a6` |
+| `chs_decrees_amik.json` | `results/signal_value/chs_events.json` | a-amik/sberindex-2026, `13f967e725` |
+| `../mo_dict.csv` (столбцы справочника) | `data/reference/sberindex_municipal_districts.csv` | stasvinokur/konkurs_sberindex_2026, `06741e1317` |
+
+Код, взятый за образец (переписан, не скопирован целиком): разбор дневных архивов Интерфакса и Ленты
+(`sbi/news_crawl.py`) и привязка заголовков к МО и типам событий (`sbi/news_geo.py`) - по
+`src/sbi/sources/news.py` и `src/sbi/newsgeo.py` репозитория a-amik/sberindex-2026 (`13f967e725`, MIT).
+
+Собственный сбор (`python -m sbi.news_crawl`): заголовки Интерфакса (`interfax.ru/news/ГГГГ/ММ/ДД`) и Ленты
+(рубрики «Россия» и «Экономика») за 2022-12 ... 2024-12 - только дата, время, заголовок, рубрика и адрес; пути
+архивов разрешены robots.txt, между запросами пауза. Сами заголовки в репозиторий не кладутся: здесь только счётчики
+`headlines_monthly_mo.csv` и `headlines_monthly_region.csv` («МО / субъект x месяц x тип события»).
+
+- `chs_decrees_amik.json` - официальные постановления о введении режима ЧС 2023-2024 гг. (дата, причина, субъект,
+  список `territory_id`), собранные a-amik с портала правовых актов.
+- `mo_dict.csv` - справочник МО СберИндекса (центр МО, субъект, координаты центра); исходный справочник опубликован
+  СберИндексом, копия - в репозитории stasvinokur.
 
 Что внутри:
 - `gdelt_monthly_*` - помесячные счётчики сообщений GDELT 2.0 (Global Database of Events, Language and Tone,
@@ -55,3 +71,7 @@ SOFTWARE.
 ```
 
 rav11l/sberindex-shocks: та же лицензия MIT, `Copyright (c) 2026 Ravil Akhtyamov`.
+
+a-amik/sberindex-2026: та же лицензия MIT, `Copyright (c) 2026 Ambartsum Amayakyan`.
+
+stasvinokur/konkurs_sberindex_2026: та же лицензия MIT, `Copyright (c) 2026 Stanislav Vinokur`.

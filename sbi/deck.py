@@ -45,6 +45,8 @@ def collect(cfg):
                       for k in ("cusum", "pelt", "bocpd", "ssm_lr", "ssm_lr_news")}}
     g = pd.read_csv(o("gdelt_event_study.csv"))
     d["gdelt"] = _records(g[(g.category == "все") & (g.news == "hazard")][["scope", "lag_news_vs_shift", "lift", "ci_low", "ci_high"]])
+    d["news_align"] = {"response": _records(pd.read_csv(o("news_response.csv"))),
+                       "event_study": _records(pd.read_csv(o("news_event_study.csv")))}
     fmc = pd.read_csv(o("fm_compare.csv"))
     d["fm_sub"] = _records(fmc[fmc.category == "Итого"][["model", "h", "MAE"]])
     iv = o("intervals.csv")

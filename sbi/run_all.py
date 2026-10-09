@@ -27,6 +27,9 @@ STEPS = [
     ["sbi.detect_real"],
     ["sbi.gdelt"],
     ["sbi.news_eval"],
+    ["sbi.news_crawl"],          # заголовки лент: докачивает только недостающие дни (кэш out/news/raw)
+    ["sbi.news_geo"],
+    ["sbi.news_align"],
     ["sbi.studies"],
     ["sbi.fm_compare"],
     ["sbi.selection"],

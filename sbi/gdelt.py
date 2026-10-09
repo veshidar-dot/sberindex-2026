@@ -129,6 +129,18 @@ def detector_with_news(panel, Z, full, sh, thr_shift, thr_news, factor, rates, w
     у МО (или его региона) был новостной всплеск за последние window месяцев. Пороги подобраны так, что
     доля месяцев с тревогой одинакова (rates). Метки - подтверждённые задним числом сдвиги |shift| >= thr_shift:
     тревога в t верна, если сдвиг начался в t-window+1 .. t; сдвиг пойман, если тревога пришла в t .. t+window-1."""
+    hits = {}
+    for var in ("hazard", "docs", "neg_docs"):
+        N_, own = surprise_matrix(panel, var)
+        hits[f"ssm_lr + GDELT {var}"] = np.nan_to_num(N_, nan=-np.inf) >= thr_news
+    out = detector_with_hits(panel, Z, full, sh, thr_shift, factor, rates, hits, window, warm)
+    out.insert(0, "news", out.detector.str.replace("ssm_lr + GDELT ", "", regex=False).where(out.detector != "ssm_lr", ""))
+    return out
+
+
+def detector_with_hits(panel, Z, full, sh, thr_shift, factor, rates, hits, window=3, warm=6, return_scores=False):
+    """То же для произвольных новостей: hits - {имя варианта: матрица (ряды панели x месяцы) «у МО была новость»}.
+    Вариант без новостей (ssm_lr) считается один раз. return_scores - вернуть ещё оценки ssm_lr и индексы рядов."""
     from .detect import ssm_lr
     from .models.panel_ssm import fit
     idx = np.where(full)[0]
@@ -137,35 +149,35 @@ def detector_with_news(panel, Z, full, sh, thr_shift, thr_news, factor, rates, w
         m = panel.cat[idx] == c
         lam, phi = fit(Z[idx[m]])[:2]
         S_lr[m] = ssm_lr(Z[idx[m]], lam, phi, w=window, warm=warm)
-    out = []
-    for var in ("hazard", "docs", "neg_docs"):
-        N_, own = surprise_matrix(panel, var)
-        N_ = N_[idx]
-        hit = np.nan_to_num(N_, nan=-np.inf) >= thr_news
+    big = np.abs(np.nan_to_num(sh[idx])) >= thr_shift
+    T = panel.T
+    cols = np.arange(warm, T - 2)              # месяцы, где метка определена
+    variants = [("ssm_lr", S_lr)]
+    for name, hit in hits.items():
+        hit = hit[idx]
         prior = np.zeros_like(S_lr)
-        for t in range(panel.T):
+        for t in range(T):
             prior[:, t] = 2 * np.log(factor) * hit[:, max(0, t - window + 1):t + 1].any(1)
-        big = np.abs(np.nan_to_num(sh[idx])) >= thr_shift
-        T = panel.T
-        cols = np.arange(warm, T - 2)          # месяцы, где метка определена
-        for name, S in (("ssm_lr", S_lr), (f"ssm_lr + GDELT {var}", S_lr + prior)):
-            vals = S[:, cols]
-            for r in rates:
-                thr = np.quantile(vals, 1 - r)
-                alarm = np.zeros_like(S, bool)
-                alarm[:, cols] = vals > thr
-                ok_alarm = np.zeros_like(alarm)
-                caught = np.zeros_like(big)
-                for t in cols:
-                    lo = max(0, t - window + 1)
-                    ok_alarm[:, t] = alarm[:, t] & big[:, lo:t + 1].any(1)
-                    caught[:, t] = big[:, t] & alarm[:, t:t + window].any(1)
-                nb = big[:, cols].sum()
-                out.append({"news": var, "detector": name, "alarm_rate": r,
-                            "precision": ok_alarm.sum() / max(alarm.sum(), 1),
-                            "recall": caught[:, cols].sum() / max(nb, 1),
-                            "alarms": int(alarm.sum()), "shifts": int(nb)})
-    return pd.DataFrame(out).drop_duplicates(subset=["detector", "alarm_rate"])
+        variants.append((name, S_lr + prior))
+    out = []
+    for name, S in variants:
+        vals = S[:, cols]
+        for r in rates:
+            thr = np.quantile(vals, 1 - r)
+            alarm = np.zeros_like(S, bool)
+            alarm[:, cols] = vals > thr
+            ok_alarm = np.zeros_like(alarm)
+            caught = np.zeros_like(big)
+            for t in cols:
+                lo = max(0, t - window + 1)
+                ok_alarm[:, t] = alarm[:, t] & big[:, lo:t + 1].any(1)
+                caught[:, t] = big[:, t] & alarm[:, t:t + window].any(1)
+            nb = big[:, cols].sum()
+            out.append({"detector": name, "alarm_rate": r,
+                        "precision": ok_alarm.sum() / max(alarm.sum(), 1),
+                        "recall": caught[:, cols].sum() / max(nb, 1),
+                        "alarms": int(alarm.sum()), "shifts": int(nb)})
+    return (pd.DataFrame(out), S_lr, idx) if return_scores else pd.DataFrame(out)
 
 
 def main():

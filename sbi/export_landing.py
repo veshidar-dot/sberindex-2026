@@ -48,6 +48,10 @@ def main():
     f = out_path(cfg, "national_oos_summary.csv")
     if f.exists():
         out["national_oos"] = pd.read_csv(f).to_dict("records")
+    if out_path(cfg, "news_response.csv").exists():   # заголовки лент и постановления о ЧС (sbi.news_align)
+        out["news_align"] = {"response": pd.read_csv(out_path(cfg, "news_response.csv")).to_dict("records"),
+                             "event_study": pd.read_csv(out_path(cfg, "news_event_study.csv")).to_dict("records"),
+                             "coverage": pd.read_csv(out_path(cfg, "news_coverage.csv")).to_dict("records")}
     f = out_path(cfg, "intervals.csv")
     if f.exists():   # покрытие интервалов (sbi.intervals), итог по всем категориям
         out["intervals"] = pd.read_csv(f).query("category == 'Итого'").to_dict("records")

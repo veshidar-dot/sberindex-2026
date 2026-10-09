@@ -263,6 +263,14 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
       </div>
       <div class="scroll"><table id="news-table"></table></div>
     </div>
+    <h3 style="margin-top:12px">Свой сбор: 215 тысяч заголовков федеральных лент и 76 постановлений о режиме ЧС</h3>
+    <div class="two">
+      <div>
+        <p class="prose">Заголовки Интерфакса и Ленты за 2023-2024 годы привязаны к МО по названию центра или района (58 из 60 привязок в ручной проверке верны) и размечены по типу события. Постановления о введении режима ЧС взяты с портала правовых актов. Ключи те же: territory_id и месяц публикации.</p>
+        <p class="prose">Федеральные ленты пишут лишь о 15 % МО, в основном о крупных городах, а сдвиги случаются в малых: у 96 % самых сильных тревог местной новости нет. Внутри одного ряда месяц с новостью по тратам не отличается от месяца без неё. Сдвиг на 1-2 месяца опережают только постановления о режиме ЧС, и то немного.</p>
+      </div>
+      <div class="scroll"><table id="news2-table"></table></div>
+    </div>
   </section>
 
   <section id="limits">
@@ -473,6 +481,15 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
       <tr><td>Реальные события: ряды с тревогой за 3 мес.</td><td>${share("ssm_lr")}</td><td>${share("ssm_lr_news")}</td></tr>
       <tr><td>Прогноз на рядах событий (каталог), MAE h = 1</td><td>${D.news_effect ? Math.round(D.news_effect.panel_ssm) + " ₽" : "-"}</td><td>${D.news_effect ? Math.round(D.news_effect.panel_ssm_news) + " ₽" : "-"}</td></tr>
       <tr><td>Поток GDELT в LightGBM, MAE h = 3, все ряды</td><td>${fmt(get("lgbm", 3, "Итого", "MAE"), "MAE")} ₽</td><td>${fmt(get("lgbm_news", 3, "Итого", "MAE"), "MAE")} ₽</td></tr></tbody>`;
+    if (D.news_align) {
+      const A = D.news_align, f = v => (v > 0 ? "+" : "") + v.toFixed(2).replace(".", ",") + " %";
+      const r = g => A.response.find(x => x.news === g && x.control === "тот же ряд без новости") || {};
+      const e = (g, sc, l) => A.event_study.find(x => x.news === g && x.scope === sc && x.lag_news_vs_shift === l) || {};
+      const ci = x => x.lift == null ? "-" : `${x.lift.toFixed(2)} [${x.ci_low.toFixed(2)}; ${x.ci_high.toFixed(2)}]`.replace(/\./g, ",");
+      document.getElementById("news2-table").innerHTML = `<thead><tr><th>Новость</th><th>Сдвиг трат в месяц новости (тот же ряд без новости)</th><th>Сдвиг через 2 мес. чаще в</th></tr></thead><tbody>` +
+        ["все местные заголовки", "ЧС, паводок, пожар", "предприятия, увольнения", "постановление о режиме ЧС"].map(g => { const x = r(g);
+          return `<tr class="${g.startsWith("постановление") ? "ours" : ""}"><td>${g}</td><td>${x.shift_pct == null ? "-" : f(x.shift_pct) + ` [${x.ci_low.toFixed(2)}; ${x.ci_high.toFixed(2)}]`.replace(/\./g, ",")}</td><td>${ci(e(g, "все ряды", -2))}</td></tr>`; }).join("") + "</tbody>";
+    }
     function share(k) { const r = D.detection_real_events || []; return r.length ? (r.filter(x => x[k] >= 0).length / r.length * 100).toFixed(1).replace(".", ",") + " %" : "-"; }
   }
 
