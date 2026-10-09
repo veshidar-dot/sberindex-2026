@@ -35,4 +35,5 @@ def panel_seasonal(panel, origins, H, params=None):
                 w = rho ** h
                 zl = np.where(np.isfinite(zs), w * last + (1 - w) * zs, w * last)
                 F[k, rows, h - 1] = np.exp(a + nf[h - 1] + zl)
+            F[k, rows[~np.isfinite(Yc).any(1)]] = np.nan     # ряд ещё не начался: прогноза нет
     return F

@@ -112,6 +112,7 @@ def panel_ssm(panel, origins, H, params=None):
             mu, r = m[:, 0] * np.sqrt(kap), m[:, 1] * np.sqrt(kap)
             nf = forecast_national(n, panel.months, o, c, ext, H, {"chronos": rule == "chronos", "ext_map": params.get("ext_map", "fixed")})[rule]
             F[k, rows] = np.exp(nf[None, :] + mu[:, None] + phi ** hs[None, :] * r[:, None])
+            F[k, rows[~np.isfinite(Yc).any(1)]] = np.nan     # ряд ещё не начался: прогноза нет, как у остальных моделей
             log.append((c, panel.months[o], lam, phi))
     params["_fitted"] = log
     return F

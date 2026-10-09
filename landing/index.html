@@ -164,6 +164,38 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     <p class="note" id="dm-note"></p>
   </section>
 
+  <section id="selection">
+    <span class="eyebrow">Выбор лучшей</span>
+    <h2>Лучшую модель выбирает процедура, а не одна цифра</h2>
+    <div class="two">
+      <div>
+        <p class="prose">Шаг 1 - набор лучших моделей (Model Confidence Set): из 18 моделей по очереди убирается худшая, пока оставшиеся нельзя различить на уровне 10 %. На 1-3 месяца в наборе одна TimesFM 2.5 на локальной части, на 6 месяцев - она и ансамбль, на 12 месяцев - ансамбль и модель пространства состояний.</p>
+        <div class="scroll"><table id="mcs-table"></table></div>
+      </div>
+      <div>
+        <p class="prose">Шаг 2 - сведение ранжирований. Каждая из 24 клеток «горизонт × категория» ранжирует модели по ошибке, а четыре правила теории выбора сводят эти ранжирования в одно. Ансамбль первый при всех четырёх и в парном сравнении точнее каждой другой модели в большинстве клеток (победитель Кондорсе).</p>
+        <div class="scroll"><table id="rank-table"></table></div>
+        <p class="note">Борда - сумма мест; Коупленд - парные победы минус поражения; Кемени - ранжирование с наименьшим числом расхождений; пороговое (Алескеров, Чистяков, Калягин) - меньше последних мест.</p>
+      </div>
+    </div>
+    <p class="prose">Детектор выбран так же, по 63 клеткам синтетики (размер сдвига или категория × доля ложных тревог): LR-тест относительно соседей с новостями первый при всех четырёх правилах.</p>
+    <div class="scroll"><table id="cum-table"></table></div>
+    <p class="note" id="cum-note"></p>
+  </section>
+
+  <section id="oos">
+    <span class="eyebrow">Вне выборки</span>
+    <h2>Проверка на 2025-2026 годах, которых модель не видела</h2>
+    <div class="two">
+      <div>
+        <p class="prose">Данных МО за 2025 год ещё нет, но национальный ряд СберИндекса известен до сентября 2026 года. Те же правила общей траектории прогнозируют его от каждой точки начала. Правила выбирались по 2023-2024 годам, так что 2025-2026 для них - честная отложенная выборка.</p>
+        <p class="prose">На 1-3 месяца правила держатся: ошибка 1,8-3,0 %, в 1,5-2,3 раза ниже Prophet. На 12 месяцев Prophet по семи годам ряда точнее: правила переносят рост прошлого года, а в 2025 году рост замедлился. Это главное направление улучшения.</p>
+      </div>
+      <div class="scroll"><table id="oos-table"></table></div>
+    </div>
+    <p class="note" id="fw-note"></p>
+  </section>
+
   <section id="detection">
     <span class="eyebrow">Структурные сдвиги</span>
     <h2>Какой детектор находит сдвиг быстрее</h2>
@@ -314,6 +346,38 @@ r(i,t) = φ·r(i,t−1) + u(i,t)     временные отклонения</di
     if (D.dm) {
       const e = D.dm.filter(r => r.model === "ensemble");
       document.getElementById("dm-note").textContent = e.length ? "Тест Диболда-Мариано против Prophet для ансамбля: " + e.map(r => `h = ${r.h}: разность |ошибок| ${Math.round(r.mean_diff)} ₽, p ${r.p < 0.001 ? "< 0,001" : "= " + r.p.toFixed(3).replace(".", ",")}`).join("; ") + ". Подчёркнуто лучшее значение в столбце." : "";
+    }
+
+    // выбор лучшей
+    if (D.selection_mcs) {
+      const sets = H.map(h => D.selection_mcs.filter(r => r.h === h && r.in_mcs).sort((a, b) => a.MAE - b.MAE).map(r => LABEL[r.model] || r.model));
+      document.getElementById("mcs-table").innerHTML = `<thead><tr><th>Горизонт</th><th>Набор лучших моделей (10 %)</th></tr></thead><tbody>` +
+        H.map((h, k) => `<tr class="${sets[k].includes(LABEL.ensemble) ? "ours" : ""}"><td>h = ${h}</td><td>${sets[k].join(", ")}</td></tr>`).join("") + "</tbody>";
+    }
+    if (D.selection_rank_forecast) {
+      const rk = D.selection_rank_forecast.slice(0, 6).concat(D.selection_rank_forecast.filter(r => r.model === "prophet"));
+      const rules = ["Борда", "Коупленд", "Кемени", "пороговое"];
+      document.getElementById("rank-table").innerHTML = `<thead><tr><th>Модель</th>${rules.map(r => `<th>${r}</th>`).join("")}</tr></thead><tbody>` +
+        rk.map(r => `<tr class="${r.model === "ensemble" ? "ours" : r.model === "prophet" ? "base" : ""}"><td>${LABEL[r.model] || r.model}</td>${rules.map(k => `<td>${r[k] == null ? "-" : Math.round(r[k])}</td>`).join("")}</tr>`).join("") + "</tbody>";
+    }
+    if (D.metrics_cumulative) {
+      const cm = ["ensemble", "timesfm_local", "panel_ssm", "prophet"];
+      const g = (m, h) => (D.metrics_cumulative.find(r => r.model === m && r.h === h) || {}).MAE_1toH;
+      document.getElementById("cum-table").innerHTML = `<thead><tr><th>Ошибка по шагам 1…H, 12 096 полных рядов, ₽</th>${H.map(h => `<th>H = ${h}</th>`).join("")}</tr></thead><tbody>` +
+        cm.map(m => `<tr class="${m === "ensemble" ? "ours" : m === "prophet" ? "base" : ""}"><td>${LABEL[m]}</td>${H.map(h => `<td>${g(m, h) == null ? "-" : g(m, h).toFixed(1).replace(".", ",")}</td>`).join("")}</tr>`).join("") + "</tbody>";
+      document.getElementById("cum-note").textContent = "Так горизонт считают в ряде других работ конкурса: средняя ошибка по шагам 1…H на рядах с полной историей. Наш Prophet в этом определении совпадает с их Prophet до десятых рубля, поэтому числа сравнимы напрямую.";
+    }
+    if (D.national_oos) {
+      const rn = { combo: "Среднее правил (в модели)", airline: "SARIMA нац. ряда", prophet: "Prophet, история с 2018 г.", naive: "Наивная" };
+      const per = [...new Set(D.national_oos.map(r => r.period))];
+      const last = per[per.length - 1];
+      const row = (p, m) => D.national_oos.find(r => r.period === p && r.rule === m) || {};
+      document.getElementById("oos-table").innerHTML = `<thead><tr><th>Ошибка, %, точки начала ${last}</th>${H.map(h => `<th>h = ${h}</th>`).join("")}</tr></thead><tbody>` +
+        Object.keys(rn).map(m => `<tr class="${m === "combo" ? "ours" : m === "prophet" ? "base" : ""}"><td>${rn[m]}</td>${H.map(h => `<td>${row(last, m)[h] == null ? "-" : row(last, m)[h].toFixed(1).replace(".", ",")}</td>`).join("")}</tr>`).join("") +
+        `<tr><td>Среднее правил на проверке 2024</td>${H.map(h => `<td>${row(per[1], "combo")[h] == null ? "-" : row(per[1], "combo")[h].toFixed(1).replace(".", ",")}</td>`).join("")}</tr></tbody>`;
+    }
+    if (D.forward) {
+      document.getElementById("fw-note").textContent = `Прогноз ансамбля на все 12 месяцев 2025 года от декабря 2024 года заморожен: ${D.forward.rows.toLocaleString("ru-RU")} значений «МО × категория × месяц», SHA-256 ${D.forward.sha256.slice(0, 16)}…, создан ${D.forward.created.slice(0, 10)}. Его можно будет сверить с данными МО за 2025 год, когда СберИндекс их опубликует.`;
     }
 
     // детекция

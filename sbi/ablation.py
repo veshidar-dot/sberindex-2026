@@ -39,8 +39,10 @@ def main():
             nf = forecast_national(n, P.months, o, c, ext, H, {"ext_map": args.ext_map})
             nf["random_walk"] = np.repeat(n[o], H)
             nf["oracle"] = np.array([n[o] + n_full[o + h] - n_full[o] if o + h < P.T else np.nan for h in hs])
+            started = np.isfinite(z).any(1)                  # у ряда без наблюдений до o прогноза нет
             for nm in names:
-                res[nm][k][m] = np.exp(a[:, None] + nf[nm][None, :] + rho ** hs[None, :] * zT[:, None])
+                res[nm][k][m] = np.where(started[:, None],
+                                         np.exp(a[:, None] + nf[nm][None, :] + rho ** hs[None, :] * zT[:, None]), np.nan)
     t = table(P, res, O, cfg["validation"]["horizons"])
     t.to_csv(out_path(cfg, f"ablation_national_{args.ext_map}.csv"), index=False, encoding="utf-8")
     print(t[t.category == "Итого"].pivot(index="model", columns="h", values="MAE").round(0).to_string())

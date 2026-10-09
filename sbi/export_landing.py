@@ -37,10 +37,20 @@ def main():
     if dm.exists():
         out["dm"] = pd.read_csv(dm).to_dict("records")
     for k in ("ablation_national_fixed", "ablation_national_auto", "detection_real_events",
-              "detection_real_top", "detection_real_labeled", "detection_summary"):
+              "detection_real_top", "detection_real_labeled", "detection_summary", "selection_rank_forecast",
+              "selection_rank_detect", "metrics_cumulative"):
         f = out_path(cfg, f"{k}.csv")
         if f.exists():
             out[k] = pd.read_csv(f).to_dict("records")
+    f = out_path(cfg, "selection_mcs.csv")
+    if f.exists():   # набор лучших моделей: только итог по всем категориям
+        out["selection_mcs"] = pd.read_csv(f).query("category == 'Итого'").to_dict("records")
+    f = out_path(cfg, "national_oos_summary.csv")
+    if f.exists():
+        out["national_oos"] = pd.read_csv(f).to_dict("records")
+    f = out_path(cfg, "forward", "manifest.json")
+    if f.exists():
+        out["forward"] = {k: v for k, v in json.loads(f.read_text(encoding="utf-8")).items() if k != "months"}
     f = out_path(cfg, "detection_synthetic.csv")
     if f.exists():   # среднее по повторам синтетики
         d = pd.read_csv(f)

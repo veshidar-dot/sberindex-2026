@@ -49,6 +49,14 @@ def table(panel, forecasts, origins, horizons):
     return pd.DataFrame(out)
 
 
+def cumulative_mae(panel, F, origins, H, rows):
+    """MAE в определении «горизонт H = средняя ошибка по шагам 1..H», только точки начала, у которых
+    известны все H шагов, и только ряды rows (так считают другие работы конкурса)."""
+    e = [np.abs(panel.V[rows, o + h] - F[k, rows, h - 1])
+         for k, o in enumerate(origins) if o + H < panel.T for h in range(1, H + 1)]
+    return float(np.nanmean(np.concatenate(e)))
+
+
 def diebold_mariano(panel, F_a, F_b, origins, h):
     """DM-тест для |e|: средняя разность потерь по МО внутри каждой точки начала,
     затем HAC-дисперсия по ряду точек начала (лаг h-1). Если точка одна (h=12),

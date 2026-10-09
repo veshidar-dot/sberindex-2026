@@ -9,7 +9,7 @@ import pandas as pd
 
 from .config import load_config, out_path
 from .data import load_panel
-from .evaluate import diebold_mariano, table
+from .evaluate import cumulative_mae, diebold_mariano, table
 
 
 def load_forecasts(cfg, names=None):
@@ -55,6 +55,13 @@ def main():
         dm.to_csv(out_path(cfg, "dm_vs_baseline.csv" if b == base else f"dm_vs_{b}.csv"), index=False, encoding="utf-8")
         print(f"\nDM против {b} (mean_diff < 0 - модель точнее):")
         print(dm[dm.model.isin(["ensemble", "panel_ssm", "timesfm_local", "prophet", "prophet_seasonal", "naive"])].round(4).to_string(index=False))
+    # для сравнения с другими работами: средняя ошибка по шагам 1..H на полных рядах
+    full = np.isfinite(panel.V).all(axis=1)
+    cum = pd.DataFrame([{"model": name, "h": h, "MAE_1toH": cumulative_mae(panel, F, origins, h, full)}
+                        for name, (F, _) in fc.items() if np.isnan(F).all(axis=(0, 2)).mean() <= 0.5 for h in hs])
+    cum.to_csv(out_path(cfg, "metrics_cumulative.csv"), index=False, encoding="utf-8")
+    print(f"\nMAE по шагам 1..H, {full.sum()} полных рядов:")
+    print(cum.pivot(index="model", columns="h", values="MAE_1toH").round(1).to_string())
     write_markdown(cfg, tab, out_path(cfg, "dm_vs_baseline.csv") if base in fc else None, hs)
 
 

@@ -39,6 +39,7 @@ def region_study(cfg, panel):
             z = panel.Y[m, :o + 1] - n - a[:, None]
             zT = np.array([q[np.isfinite(q)][-1] if np.isfinite(q).any() else 0.0 for q in z])
             nf = forecast_national(n, panel.months, o, c, ext, H)["combo"]
+            zT = np.where(np.isfinite(z).any(1), zT, np.nan)  # у ряда без наблюдений до o прогноза нет
             for h in range(1, H + 1):
                 base = a + nf[h - 1] + zT
                 res[names[0]][k, m, h - 1] = np.exp(base)

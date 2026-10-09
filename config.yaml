@@ -121,8 +121,27 @@ models:
     batch_size: 256
     threads: 6
 
+selection:                            # выбор лучшей модели и детектора (sbi.selection)
+  alpha: 0.10                         # уровень набора лучших моделей (MCS)
+  boot: 1000                          # бутстреп по МО
+  kemeny_top: 12                      # точное ранжирование Кемени для первых 12 по Борда
+  models: [naive, seasonal_naive, prophet, prophet_seasonal, panel_ssm, panel_ssm_automap, panel_ssm_news,
+           panel_ssm_chronos, panel_seasonal, lgbm, lgbm_news, chronos2, chronos2_cross, chronos2_local,
+           chronos2_ft_local, timesfm, timesfm_local, ensemble]   # все модели на всей панели (TiRex - на подвыборке)
+
+forward:                              # прогноз вперёд ансамблем (sbi.forward), замораживается с SHA-256
+  origin: "2024-12"                   # последний месяц панели
+  horizon: 12
+  file: ensemble_2025.csv.gz
+
+national_oos:                         # правила общей траектории на самом нац. ряде (sbi.national_oos)
+  periods:                            # точки начала (последний известный месяц), включительно
+    "2023 (история)": ["2022-12", "2023-11"]
+    "2024 (проверка)": ["2023-12", "2024-11"]
+    "2025-2026 (вне выборки)": ["2024-12", "2026-08"]
+
 detection:
-  ref_months: 8                       # опорный период: шум и уровень ряда
+  ref_months: 8                     # опорный период: шум и уровень ряда
   per_category: 300                   # рядов на категорию в синтетическом эксперименте
   inject_share: 0.3
   tau_min: 8                          # месяц вставки ступеньки (индекс, 0 = 2023-01)
